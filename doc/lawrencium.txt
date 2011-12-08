@@ -1,0 +1,45 @@
+*lawrencium.txt*  Mercurial wrapper for VIM
+
+Author:  Ludovic Chabant <http://ludovic.chabant.com>
+License: Same terms as Vim itself (see |license|)
+
+This plugin is only available if 'compatible' is not set.
+
+INTRODUCTION                                    *lawrencium*
+
+When a file from a Mercurial repository is open in a buffer, that buffer gets
+new commands defined.
+
+COMMANDS                                        *lawrencium-commands*
+
+All commands defined by |lawrencium| are local to each buffer.
+
+                                                *lawrencium-:Hg*
+:Hg [args]              Run an arbitrary Mercurial command. Similar to :!hg
+                        [args] but the '--repository' is automatically
+                        specified with the root of the repository the current
+                        file belongs to.
+
+                                                *lawrencium-:Hg!*
+:Hg! [args]             Like |:Hg|, but the output of the command is placed in
+                        a temp file and edited in the |preview-window|.
+
+                                                *lawrencium-:Hgcd*
+:Hgcd [directory]       |:cd| relative to the root of the repository.
+
+                                                *lawrencium-:Hglcd*
+:Hglcd [directory]      |:lcd| relative to the root of the repository.
+
+                                                *lawrencium-:Hgstatus*
+:Hgstatus               Shows the output of 'hg status' in the
+                        |preview-window|.
+
+
+ABOUT                                           *lawrencium-about*
+
+Grab the latest version or report a bug on BitBucket:
+
+http://bitbucket.org/ludovicchabant/lawrencium
+
+
+ vim:tw=78:et:ft=help:norl:
