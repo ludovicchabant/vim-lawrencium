@@ -2,7 +2,7 @@
 Lawrencium
 ==========
 
-Lawrencium is a [Mercurial] wrapper for [Vim], inspired by Tim Pope's [Fugitive].
+Lawrencium is a [Mercurial][] wrapper for [Vim][], inspired by Tim Pope's [Fugitive][].
 
 
 Disclaimer
@@ -14,7 +14,7 @@ This plugin is still very young, and it's also the very first one I've ever writ
 Installation
 ------------
 
-The recommended method to install Lawrencium is to use [Pathogen], also from Tim Pope:
+The recommended method to install Lawrencium is to use [Pathogen][], also from Tim Pope:
 
     cd ~/.vim/bundle
     hg clone https://bitbucket.org/ludovicchabant/lawrencium
