@@ -188,7 +188,7 @@ augroup end
 
 " }}}
 
-" Commands {{{
+" Main Buffer Commands {{{
 
 let s:main_commands = []
 
@@ -207,26 +207,53 @@ augroup lawrencium_main
     autocmd User Lawrencium call s:DefineMainCommands()
 augroup end
 
-" }}}
 
-" HgExecute {{{
+" Hg {{{
 
-function! s:HgExecute(...) abort
+function! s:Hg(...) abort
     let l:repo = s:hg_repo()
     echo call(l:repo.RunCommand, a:000, l:repo)
 endfunction
 
-call s:AddMainCommand("-nargs=* Hg :execute s:HgExecute(<f-args>)")
+call s:AddMainCommand("-nargs=* Hg :execute s:Hg(<f-args>)")
 
 " }}}
 
-" HgStatus {{{
+" Hgstatus {{{
+
+let s:hg_status_messages = { 
+    \'M': 'modified',
+    \'A': 'added',
+    \'R': 'removed',
+    \'C': 'clean',
+    \'!': 'missing',
+    \'?': 'not tracked',
+    \'I': 'ignored',
+    \}
 
 function! s:HgStatus() abort
-    echo s:hg_repo().RunCommand('status')
+    let l:repo = s:hg_repo()
+    let l:status_text = l:repo.RunCommand('status')
+    let l:status_lines = split(l:status_text, '\n')
+    let l:entries = []
+    for l:line in l:status_lines
+        if l:line =~# '^\s*$'
+            continue
+        endif
+        echom "STATUS: " . l:line
+        let l:tokens = split(l:line, '\s\+')
+        let l:entry = {
+            \'type': l:tokens[0],
+            \'filename': (l:repo.root_dir . l:tokens[1]),
+            \'text': s:hg_status_messages[l:tokens[0]],
+            \}
+        call add(l:entries, l:entry)
+    endfor
+    call setloclist(0, l:entries)
+    lopen
 endfunction
 
-call s:AddMainCommand("HgStatus :execute s:HgStatus()")
+call s:AddMainCommand("Hgstatus :execute s:HgStatus()")
 
 " }}}
 
@@ -252,6 +279,8 @@ function! s:ListRepoFiles(ArgLead, CmdLine, CursorPos) abort
 endfunction
 
 call s:AddMainCommand("-bang -nargs=? -complete=customlist,s:ListRepoFiles Hgedit :edit<bang> `=s:hg_repo().GetFullPath(<q-args>)`")
+
+" }}}
 
 " }}}
 
