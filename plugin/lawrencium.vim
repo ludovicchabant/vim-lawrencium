@@ -292,10 +292,11 @@ function! lawrencium#statusline(...)
     if !exists('b:mercurial_dir')
         return ''
     endif
-    let l:summary = s:hg_repo().RunCommand('summary')
-    let l:parent_rev = matchstr(l:summary, 'parent\: \d+\:[0-9a-f]+')
-    let l:branch = matchstr(l:summary, 'branch\: [\d\w\-_\.]+')
-    return l:branch . ', ' . l:parent_rev
+    let l:prefix = (a:0 > 0 ? a:1 : '')
+    let l:suffix = (a:0 > 1 ? a:2 : '')
+    let l:branch_file = s:hg_repo().GetFullPath('.hg/branch')
+    let l:branch = readfile(l:branch_file)[0]
+    return l:prefix . l:branch .  l:suffix
 endfunction
 
 " Rescans the current buffer for setting up Mercurial commands.
