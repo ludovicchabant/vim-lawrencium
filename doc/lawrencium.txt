@@ -15,24 +15,31 @@ COMMANDS                                        *lawrencium-commands*
 All commands defined by |lawrencium| are local to each buffer.
 
                                                 *lawrencium-:Hg*
-:Hg [args]              Run an arbitrary Mercurial command. Similar to :!hg
+:Hg {args}              Run an arbitrary Mercurial command. Similar to :!hg
                         [args] but the '--repository' is automatically
                         specified with the root of the repository the current
                         file belongs to.
 
                                                 *lawrencium-:Hg!*
-:Hg! [args]             Like |:Hg|, but the output of the command is placed in
+:Hg! {args}             Like |:Hg|, but the output of the command is placed in
                         a temp file and edited in the |preview-window|.
 
                                                 *lawrencium-:Hgcd*
-:Hgcd [directory]       |:cd| relative to the root of the repository.
+:Hgcd[!] {path}         |:cd| relative to the root of the repository.
 
                                                 *lawrencium-:Hglcd*
-:Hglcd [directory]      |:lcd| relative to the root of the repository.
+:Hglcd[!] {path}        |:lcd| relative to the root of the repository.
+
+                                                *lawrencium-:Hgedit*
+:Hgedit {file}          |:edit| {file} relative to the root of the repository.
+
+                                                *lawrencium-:Hgedit!*
+:Hgedit! {file}         |:edit!| {file} relative to the root of the repository.
 
                                                 *lawrencium-:Hgstatus*
 :Hgstatus               Shows the output of 'hg status' in the
                         |preview-window|.
+                        You can navigate to the next/previous file with "n"/"p".
 
 
 ABOUT                                           *lawrencium-about*

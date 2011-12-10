@@ -11,6 +11,9 @@ endif
 if (exists('g:loaded_lawrencium') || &cp) && !g:lawrencium_debug
     finish
 endif
+if (exists('g:loaded_lawrencium') && g:lawrencium_debug)
+    echom "Reloaded Lawrencium."
+endif
 let g:loaded_lawrencium = 1
 
 if !exists('g:lawrencium_hg_executable')
@@ -19,10 +22,6 @@ endif
 
 if !exists('g:lawrencium_trace')
     let g:lawrencium_trace = 0
-endif
-
-if g:lawrencium_debug
-    echom "Loaded Lawrencium."
 endif
 
 " }}}
@@ -46,8 +45,8 @@ function! s:normalizepath(path)
 endfunction
 
 " Prints a message if debug tracing is enabled.
-function! s:trace(message)
-   if g:lawrencium_trace 
+function! s:trace(message, ...)
+   if g:lawrencium_trace || (a:0 && a:1)
        let l:message = "lawrencium: " . a:message
        echom l:message
    endif
@@ -232,25 +231,52 @@ let s:hg_status_messages = {
     \}
 
 function! s:HgStatus() abort
+    " Get the repo and the `hg status` output.
     let l:repo = s:hg_repo()
     let l:status_text = l:repo.RunCommand('status')
     let l:status_lines = split(l:status_text, '\n')
-    let l:entries = []
-    for l:line in l:status_lines
-        if l:line =~# '^\s*$'
-            continue
-        endif
-        echom "STATUS: " . l:line
-        let l:tokens = split(l:line, '\s\+')
-        let l:entry = {
-            \'type': l:tokens[0],
-            \'filename': (l:repo.root_dir . l:tokens[1]),
-            \'text': s:hg_status_messages[l:tokens[0]],
-            \}
-        call add(l:entries, l:entry)
-    endfor
-    call setloclist(0, l:entries)
-    lopen
+
+    " Open a new temp buffer in the preview window, jump to it,
+    " and paste the `hg status` output in there.
+    " Also, make it a nice size, but restore the `previewheight` setting after
+    " we're done.
+    let l:temp_file = tempname()
+    let l:preview_height = &previewheight
+    execute "setlocal previewheight=" . (len(l:status_lines) + 1)
+    execute "pedit " . l:temp_file
+    wincmd p
+    call append(0, l:status_lines)
+    execute "setlocal previewheight=" . l:preview_height
+    
+    " Setup the buffer correctly.
+    let b:mercurial_dir = l:repo.root_dir
+    setlocal buftype=nofile
+    setlocal nomodified
+    setlocal nomodifiable
+    setlocal readonly
+    
+    " Add some handy mappings.
+    nnoremap <buffer> <silent> <C-N> :call search('^[MARC\!\?I ]\s.', 'We')<cr>
+    nnoremap <buffer> <silent> <C-P> :call search('^[MARC\!\?I ]\s.','Wbe')<cr>
+    nnoremap <buffer> <silent> <cr>  :execute <SID>HgStatus_FileEdit()<cr>
+    nnoremap <buffer> <silent> q     :bdelete<cr>
+endfunction
+
+function! s:HgStatus_FileEdit() abort
+    let l:repo = s:hg_repo()
+    let l:line = getline('.')
+    " Yay, awesome, Vim's regex syntax is fucked up like shit, especially for
+    " look-aheads and look-behinds. See for yourself:
+    let l:filename = matchstr(l:line, '\([MARC\!\?I ]\s\)\@<=.*')
+    let l:filename = l:repo.GetFullPath(l:filename)
+    " Go back to the previous window and open the file there, or open an
+    " existing buffer.
+    wincmd p
+    if bufexists(l:filename)
+        execute 'buffer ' . l:filename
+    else
+        execute 'edit ' . l:filename
+    endif
 endfunction
 
 call s:AddMainCommand("Hgstatus :execute s:HgStatus()")
