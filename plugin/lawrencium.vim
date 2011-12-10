@@ -248,12 +248,14 @@ function! s:HgStatus() abort
     call append(0, l:status_lines)
     execute "setlocal previewheight=" . l:preview_height
     
-    " Setup the buffer correctly.
+    " Setup the buffer correctly: readonly, and with the correct repo linked
+    " to it.
     let b:mercurial_dir = l:repo.root_dir
     setlocal buftype=nofile
     setlocal nomodified
     setlocal nomodifiable
     setlocal readonly
+    setlocal syntax=hgstatus
     
     " Add some handy mappings.
     nnoremap <buffer> <silent> <C-N> :call search('^[MARC\!\?I ]\s.', 'We')<cr>
