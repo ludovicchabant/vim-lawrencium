@@ -189,6 +189,8 @@ augroup end
 
 " Main Buffer Commands {{{
 
+" Store the commands for Lawrencium-enabled buffers so that we can add them in
+" batch when we need to.
 let s:main_commands = []
 
 function! s:AddMainCommand(command) abort
@@ -206,15 +208,38 @@ augroup lawrencium_main
     autocmd User Lawrencium call s:DefineMainCommands()
 augroup end
 
+" Auto-complete function for commands that take repo-relative file paths.
+function! s:ListRepoFiles(ArgLead, CmdLine, CursorPos) abort
+    let l:matches = s:hg_repo().Glob(a:ArgLead . '*', 1)
+    call map(l:matches, 's:normalizepath(v:val)')
+    return l:matches
+endfunction
+
+" Auto-complete function for commands that take repo-relative directory paths.
+function! s:ListRepoDirs(ArgLead, CmdLine, CursorPos) abort
+    let l:matches = s:hg_repo().Glob(a:ArgLead . '*/')
+    call map(l:matches, 's:normalizepath(v:val)')
+    return l:matches
+endfunction
 
 " Hg {{{
 
-function! s:Hg(...) abort
+function! s:Hg(bang, ...) abort
     let l:repo = s:hg_repo()
-    echo call(l:repo.RunCommand, a:000, l:repo)
+    let l:output = call(l:repo.RunCommand, a:000, l:repo)
+    if a:bang
+        " Open the output of the command in a temp file.
+        let l:temp_file = tempname()
+        execute 'pedit ' . l:temp_file
+        wincmd p
+        call append(0, l:output)
+    else
+        " Just print out the output of the command.
+        echo l:output
+    endif
 endfunction
 
-call s:AddMainCommand("-nargs=* Hg :execute s:Hg(<f-args>)")
+call s:AddMainCommand("-bang -nargs=* Hg :execute s:Hg(<bang>0, <f-args>)")
 
 " }}}
 
@@ -241,6 +266,7 @@ function! s:HgStatus() abort
     " Also, make it a nice size, but restore the `previewheight` setting after
     " we're done.
     let l:temp_file = tempname()
+    let l:temp_file = fnamemodify(l:temp_file, ':h') . 'hg-status-' . fnamemodify(l:temp_file, ':t') . '.txt'
     let l:preview_height = &previewheight
     execute "setlocal previewheight=" . (len(l:status_lines) + 1)
     execute "pedit " . l:temp_file
@@ -287,12 +313,6 @@ call s:AddMainCommand("Hgstatus :execute s:HgStatus()")
 
 " Hgcd, Hglcd {{{
 
-function! s:ListRepoDirs(ArgLead, CmdLine, CursorPos) abort
-    let l:matches = s:hg_repo().Glob(a:ArgLead . '*/')
-    call map(l:matches, 's:normalizepath(v:val)')
-    return l:matches
-endfunction
-
 call s:AddMainCommand("-bang -nargs=? -complete=customlist,s:ListRepoDirs Hgcd :cd<bang> `=s:hg_repo().GetFullPath(<q-args>)`")
 call s:AddMainCommand("-bang -nargs=? -complete=customlist,s:ListRepoDirs Hglcd :lcd<bang> `=s:hg_repo().GetFullPath(<q-args>)`")
 
@@ -300,13 +320,69 @@ call s:AddMainCommand("-bang -nargs=? -complete=customlist,s:ListRepoDirs Hglcd 
 
 " Hgedit {{{
 
-function! s:ListRepoFiles(ArgLead, CmdLine, CursorPos) abort
-    let l:matches = s:hg_repo().Glob(a:ArgLead . '*', 1)
-    call map(l:matches, 's:normalizepath(v:val)')
-    return l:matches
+call s:AddMainCommand("-bang -nargs=? -complete=customlist,s:ListRepoFiles Hgedit :edit<bang> `=s:hg_repo().GetFullPath(<q-args>)`")
+
+" }}}
+
+" Hgdiff {{{
+
+function! s:HgDiff(filename, vertical, ...) abort
+    " Default revisions to diff: the working directory (special Lawrencium 
+    " hard-coded syntax) and the parent of the working directory (using 
+    " Mercurial's revsets syntax).
+    let l:rev1 = 'lawrencium#_wdir_'
+    let l:rev2 = 'p1()'
+    if a:0 == 1
+        let l:rev2 = a:1
+    elseif a:0 == 2
+        let l:rev1 = a:1
+        let l:rev2 = a:2
+    endif
+
+    " Get the current repo, and expand the given filename in case it contains
+    " fancy filename modifiers.
+    let l:repo = s:hg_repo()
+    let l:path = expand(a:filename)
+    call s:trace("Diff'ing '".l:rev1."' and '".l:rev2."' on file: ".l:path)
+
+    " We'll keep a list of buffers in this diff, so when one exits, the
+    " others' 'diff' flag is turned off.
+    let l:diff_buffers = []
+
+    " Get the first file and open it.
+    if l:rev1 == 'lawrencium#_wdir_'
+        if bufexists(l:path)
+            execute 'buffer ' . fnameescape(l:path)
+        else
+            execute 'edit ' . fnameescape(l:path)
+        endif
+    else
+        let l:temp_file = tempname()
+        call l:repo.RunCommand('cat', '-r', '"'.l:rev1.'"', '-o', l:temp_file, l:path)
+        execute 'edit ' . fnameescape(l:temp_file)
+    endif
+    " Set it up to be part of the diff windows, set its repo dir.
+    diffthis
+    let b:mercurial_dir = l:repo.root_dir
+
+    " Get the second file and open it too.
+    let l:diffsplit = 'diffsplit'
+    if a:vertical
+        let l:diffsplit = 'vertical diffsplit'
+    endif
+    if l:rev2 == 'lawrencium#_wdir_'
+        execute l:diffsplit . ' ' . fnameescape(l:path)
+    else
+        let l:temp_file = tempname()
+        call l:repo.RunCommand('cat', '-r', '"'.l:rev2.'"', '-o', l:temp_file, l:path)
+        execute l:diffsplit . ' ' . fnameescape(l:temp_file)
+    endif
+    " Set its repo dir.
+    let b:mercurial_dir = l:repo.root_dir
 endfunction
 
-call s:AddMainCommand("-bang -nargs=? -complete=customlist,s:ListRepoFiles Hgedit :edit<bang> `=s:hg_repo().GetFullPath(<q-args>)`")
+call s:AddMainCommand("-nargs=* -complete=customlist,s:ListRepoFiles Hgdiff :execute s:HgDiff('%:p', 0, <f-args>)")
+call s:AddMainCommand("-nargs=* -complete=customlist,s:ListRepoFiles Hgvdiff :execute s:HgDiff('%:p', 1, <f-args>)")
 
 " }}}
 
