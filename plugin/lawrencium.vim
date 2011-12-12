@@ -287,16 +287,15 @@ function! s:HgStatus() abort
     nnoremap <buffer> <silent> <C-N> :call search('^[MARC\!\?I ]\s.', 'We')<cr>
     nnoremap <buffer> <silent> <C-P> :call search('^[MARC\!\?I ]\s.','Wbe')<cr>
     nnoremap <buffer> <silent> <cr>  :execute <SID>HgStatus_FileEdit()<cr>
+    nnoremap <buffer> <silent> <C-D> :execute <SID>HgStatus_FileDiff(0)<cr>
+    nnoremap <buffer> <silent> <C-V> :execute <SID>HgStatus_FileDiff(1)<cr>
     nnoremap <buffer> <silent> q     :bdelete<cr>
 endfunction
 
 function! s:HgStatus_FileEdit() abort
-    let l:repo = s:hg_repo()
-    let l:line = getline('.')
-    " Yay, awesome, Vim's regex syntax is fucked up like shit, especially for
-    " look-aheads and look-behinds. See for yourself:
-    let l:filename = matchstr(l:line, '\([MARC\!\?I ]\s\)\@<=.*')
-    let l:filename = l:repo.GetFullPath(l:filename)
+    " Get the path of the file the cursor is on.
+    let l:filename = s:HgStatus_GetSelectedPath()
+    
     " Go back to the previous window and open the file there, or open an
     " existing buffer.
     wincmd p
@@ -305,6 +304,25 @@ function! s:HgStatus_FileEdit() abort
     else
         execute 'edit ' . l:filename
     endif
+endfunction
+
+function! s:HgStatus_FileDiff(vertical) abort
+    " Get the path of the file the cursor is on.
+    let l:filename = s:HgStatus_GetSelectedPath()
+    
+    " Go back to the previous window and call HgDiff.
+    wincmd p
+    call s:HgDiff(l:filename, a:vertical)
+endfunction
+
+function! s:HgStatus_GetSelectedPath() abort
+    let l:repo = s:hg_repo()
+    let l:line = getline('.')
+    " Yay, awesome, Vim's regex syntax is fucked up like shit, especially for
+    " look-aheads and look-behinds. See for yourself:
+    let l:filename = matchstr(l:line, '\([MARC\!\?I ]\s\)\@<=.*')
+    let l:filename = l:repo.GetFullPath(l:filename)
+    return l:filename
 endfunction
 
 call s:AddMainCommand("Hgstatus :execute s:HgStatus()")
