@@ -468,8 +468,14 @@ function! s:HgCommit_Execute(log_file, show_output) abort
         return
     endif
 
-    " Get the repo and commit with the given message.
     call s:trace("Committing with log file: " . a:log_file)
+
+    " Clean up all the 'HG:' lines from the commit message.
+    let l:lines = readfile(a:log_file)
+    call filter(l:lines, "v:val !~# '\\v^HG:'")
+    call writefile(l:lines, a:log_file)
+
+    " Get the repo and commit with the given message.
     let l:repo = s:hg_repo()
     let l:output = l:repo.RunCommand('commit', '-l', a:log_file)
     if a:show_output
