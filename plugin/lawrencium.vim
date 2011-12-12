@@ -94,7 +94,7 @@ endfunction
 " Gets a full path given a repo-relative path
 function! s:HgRepo.GetFullPath(path) abort
     let l:root_dir = self.root_dir
-    if a:path =~# '^[/\\]'
+    if a:path =~# '\v^[/\\]'
         let l:root_dir = s:stripslash(l:root_dir)
     endif
     return l:root_dir . a:path
@@ -105,7 +105,7 @@ endfunction
 " directories.
 function! s:HgRepo.Glob(pattern, ...) abort
     let l:root_dir = self.root_dir
-    if (a:pattern =~# '^[/\\]')
+    if (a:pattern =~# '\v^[/\\]')
         let l:root_dir = s:stripslash(l:root_dir)
     endif
     let l:matches = split(glob(l:root_dir . a:pattern), '\n')
@@ -160,7 +160,7 @@ function! s:setup_buffer_commands() abort
     call s:trace("Scanning buffer '" . bufname('%') . "' for Lawrencium setup...")
     let l:do_setup = 1
     if exists('b:mercurial_dir')
-        if b:mercurial_dir =~# '/^\s*$/'
+        if b:mercurial_dir =~# '\v^\s*$'
             unlet b:mercurial_dir
         else
             let l:do_setup = 0
@@ -249,20 +249,24 @@ function! s:HgStatus() abort
     " Get the repo and the `hg status` output.
     let l:repo = s:hg_repo()
     let l:status_text = l:repo.RunCommand('status')
-    let l:status_lines = split(l:status_text, '\n')
+    if l:status_text ==# '\v\%^\s*\%$'
+        echo "Nothing modified."
+    endif
 
     " Open a new temp buffer in the preview window, jump to it,
     " and paste the `hg status` output in there.
-    " Also, make it a nice size, but restore the `previewheight` setting after
-    " we're done.
     let l:temp_file = tempname()
     let l:temp_file = fnamemodify(l:temp_file, ':h') . 'hg-status-' . fnamemodify(l:temp_file, ':t') . '.txt'
     let l:preview_height = &previewheight
+    let l:status_lines = split(l:status_text, '\n')
     execute "setlocal previewheight=" . (len(l:status_lines) + 1)
     execute "pedit " . l:temp_file
     wincmd p
     call append(0, l:status_lines)
+    " Make it a nice size. 
     execute "setlocal previewheight=" . l:preview_height
+    " Make sure it's deleted when we exit the window.
+    setlocal bufhidden=delete
     
     " Setup the buffer correctly: readonly, and with the correct repo linked
     " to it.
@@ -310,7 +314,7 @@ function! s:HgStatus_GetSelectedPath() abort
     let l:line = getline('.')
     " Yay, awesome, Vim's regex syntax is fucked up like shit, especially for
     " look-aheads and look-behinds. See for yourself:
-    let l:filename = matchstr(l:line, '\([MARC\!\?I ]\s\)\@<=.*')
+    let l:filename = matchstr(l:line, '\v([MARC\!\?I ]\s)@<=.*')
     let l:filename = l:repo.GetFullPath(l:filename)
     return l:filename
 endfunction
@@ -364,14 +368,19 @@ function! s:HgDiff(filename, vertical, ...) abort
         else
             execute 'edit ' . fnameescape(l:path)
         endif
+        " Make it part of the diff group.
+        diffthis
     else
         let l:temp_file = tempname()
         call l:repo.RunCommand('cat', '-r', '"'.l:rev1.'"', '-o', l:temp_file, l:path)
         execute 'edit ' . fnameescape(l:temp_file)
+        " Make it part of the diff group.
+        diffthis
+        " Remember the repo it belongs to.
+        let b:mercurial_dir = l:repo.root_dir
+        " Make sure it's deleted when we move away from it.
+        setlocal bufhidden=delete
     endif
-    " Set it up to be part of the diff windows, set its repo dir.
-    diffthis
-    let b:mercurial_dir = l:repo.root_dir
 
     " Get the second file and open it too.
     let l:diffsplit = 'diffsplit'
@@ -384,9 +393,11 @@ function! s:HgDiff(filename, vertical, ...) abort
         let l:temp_file = tempname()
         call l:repo.RunCommand('cat', '-r', '"'.l:rev2.'"', '-o', l:temp_file, l:path)
         execute l:diffsplit . ' ' . fnameescape(l:temp_file)
+        " Remember the repo it belongs to.
+        let b:mercurial_dir = l:repo.root_dir
+        " Make sure it's deleted when we move away from it.
+        setlocal bufhidden=delete
     endif
-    " Set its repo dir.
-    let b:mercurial_dir = l:repo.root_dir
 endfunction
 
 call s:AddMainCommand("-nargs=* -complete=customlist,s:ListRepoFiles Hgdiff :execute s:HgDiff('%:p', 0, <f-args>)")
@@ -442,7 +453,7 @@ function! s:HgCommit_GenerateMessage(repo) abort
         if l:line ==# ''
             continue
         endif
-        let l:type = matchstr(l:line, '^[MARC\!\?I ]')
+        let l:type = matchstr(l:line, '\v^[MARC\!\?I ]')
         let l:path = l:line[2:]
         let l:msg .= "HG: " . s:hg_status_messages[l:type] . ' ' . l:path . "\n"
     endfor
