@@ -245,16 +245,6 @@ call s:AddMainCommand("-bang -nargs=* Hg :execute s:Hg(<bang>0, <f-args>)")
 
 " Hgstatus {{{
 
-let s:hg_status_messages = { 
-    \'M': 'modified',
-    \'A': 'added',
-    \'R': 'removed',
-    \'C': 'clean',
-    \'!': 'missing',
-    \'?': 'not tracked',
-    \'I': 'ignored',
-    \}
-
 function! s:HgStatus() abort
     " Get the repo and the `hg status` output.
     let l:repo = s:hg_repo()
@@ -401,6 +391,83 @@ endfunction
 
 call s:AddMainCommand("-nargs=* -complete=customlist,s:ListRepoFiles Hgdiff :execute s:HgDiff('%:p', 0, <f-args>)")
 call s:AddMainCommand("-nargs=* -complete=customlist,s:ListRepoFiles Hgvdiff :execute s:HgDiff('%:p', 1, <f-args>)")
+
+" }}}
+
+" Hgcommit {{{
+
+function! s:HgCommit(bang, vertical) abort
+    " Get the repo we'll be committing into.
+    let l:repo = s:hg_repo()
+
+    " Open a commit message file.
+    let l:commit_path = tempname()
+    let l:split = a:vertical ? 'vsplit' : 'split'
+    execute l:split . ' ' . l:commit_path
+    call append(0, ['', ''])
+    call append(2, split(s:HgCommit_GenerateMessage(l:repo), '\n'))
+
+    " Setup the auto-command that will actually commit on write/exit,
+    " and make the buffer delete itself on exit.
+    let b:mercurial_dir = l:repo.root_dir
+    setlocal bufhidden=delete
+    if a:bang
+        autocmd BufDelete <buffer> call s:HgCommit_Execute(expand('<afile>:p'), 1)
+    else
+        autocmd BufDelete <buffer> call s:HgCommit_Execute(expand('<afile>:p'), 0)
+    endif
+endfunction
+
+let s:hg_status_messages = { 
+    \'M': 'modified',
+    \'A': 'added',
+    \'R': 'removed',
+    \'C': 'clean',
+    \'!': 'missing',
+    \'?': 'not tracked',
+    \'I': 'ignored',
+    \' ': '',
+    \}
+
+function! s:HgCommit_GenerateMessage(repo) abort
+    let l:msg  = "HG: Enter commit message. Lines beginning with 'HG:' are removed.\n"
+    let l:msg .= "HG: Leave message empty to abort commit.\n"
+    let l:msg .= "HG: Write and quit buffer to proceed.\n"
+    let l:msg .= "HG: --\n"
+    let l:msg .= "HG: user: " . split(a:repo.RunCommand('showconfig ui.username'), '\n')[0] . "\n"
+    let l:msg .= "HG: branch '" . split(a:repo.RunCommand('branch'), '\n')[0] . "'\n"
+
+    let l:status_lines = split(a:repo.RunCommand('status'), "\n")
+    for l:line in l:status_lines
+        if l:line ==# ''
+            continue
+        endif
+        let l:type = matchstr(l:line, '^[MARC\!\?I ]')
+        let l:path = l:line[2:]
+        let l:msg .= "HG: " . s:hg_status_messages[l:type] . ' ' . l:path . "\n"
+    endfor
+
+    return l:msg
+endfunction
+
+function! s:HgCommit_Execute(log_file, show_output) abort
+    " Check if the user actually saved a commit message.
+    if !filereadable(a:log_file)
+        call s:trace("Commit message was not saved... abort commit.")
+        return
+    endif
+
+    " Get the repo and commit with the given message.
+    call s:trace("Committing with log file: " . a:log_file)
+    let l:repo = s:hg_repo()
+    let l:output = l:repo.RunCommand('commit', '-l', a:log_file)
+    if a:show_output
+        echom l:output
+    endif
+endfunction
+
+call s:AddMainCommand("-bang Hgcommit :execute s:HgCommit(<bang>0, 0)")
+call s:AddMainCommand("-bang Hgvcommit :execute s:HgCommit(<bang>0, 1)")
 
 " }}}
 
