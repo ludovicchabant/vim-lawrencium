@@ -1,52 +1,89 @@
 *lawrencium.txt*  Mercurial wrapper for VIM
 
-Author:  Ludovic Chabant <http://ludovic.chabant.com>
-License: Same terms as Vim itself (see |license|)
 
-This plugin is only available if 'compatible' is not set.
+                LAWRENCIUM REFERENCE MANUAL
+                    by Ludovic Chabant
 
-INTRODUCTION                                    *lawrencium*
+
+                                                *lawrencium*
+
+1.  Introduction            |lawrencium-intro|
+2.  Commands                |lawrencium-commands|
+
+
+=============================================================================
+1.  Introduction                                *lawrencium-intro*
 
 When a file from a Mercurial repository is open in a buffer, that buffer gets
 new commands defined.
 
-COMMANDS                                        *lawrencium-commands*
+This plugin is only available if 'compatible' is not set.
+
+Grab the latest version or report a bug on BitBucket:
+
+http://bitbucket.org/ludovicchabant/vim-lawrencium
+
+
+
+=============================================================================
+2.  Commands                                    *lawrencium-commands*
 
 All commands defined by |lawrencium| are local to each buffer.
 
-                                                *lawrencium-:Hg*
+                                                *:Hg*
 :Hg {args}              Run an arbitrary Mercurial command. Similar to :!hg
                         [args] but the '--repository' is automatically
                         specified with the root of the repository the current
                         file belongs to.
 
-                                                *lawrencium-:Hg!*
+                                                *:Hg!*
 :Hg! {args}             Like |:Hg|, but the output of the command is placed in
                         a temp file and edited in the |preview-window|.
 
-                                                *lawrencium-:Hgcd*
+                                                *:Hgcd*
 :Hgcd[!] {path}         |:cd| relative to the root of the repository.
 
-                                                *lawrencium-:Hglcd*
+                                                *:Hglcd*
 :Hglcd[!] {path}        |:lcd| relative to the root of the repository.
 
-                                                *lawrencium-:Hgedit*
+                                                *:Hgedit*
 :Hgedit {file}          |:edit| {file} relative to the root of the repository.
 
-                                                *lawrencium-:Hgedit!*
+                                                *:Hgedit!*
 :Hgedit! {file}         |:edit!| {file} relative to the root of the repository.
 
-                                                *lawrencium-:Hgstatus*
+                                                *:Hgstatus*
 :Hgstatus               Shows the output of 'hg status' in the
                         |preview-window|.
-                        You can navigate to the next/previous file with "n"/"p".
+                        You can navigate to the next/previous file with <C-N> 
+                        and <C-P>, open a file with <cr>, diff the local file
+                        with the parent revision with <C-D> and <C-V>,
+                        depending on whether you want a horizontal or vertical
+                        split window.
+
+                                                *:Hgdiff*
+:Hgdiff                 Diffs the current file against its parent revision.
+
+                                                *:Hgdiff_f*
+:Hgdiff {revspec}       Diffs the current file against the specified revision.
+
+                                                *:Hgvdiff*
+:Hgvdiff                Same as |:Hgdiff| but uses a vertical split.
+
+                                                *:Hgvdiff_f*
+:Hgvdiff {revspec}      Same as |:Hgdiff_f| but uses a vertical split.
+
+                                                *:Hgcommit*
+:Hgcommit               Opens a new window to edit a commit message into a
+                        temporary file and, upon quitting the buffer, if that
+                        file has been written to, commit the current changes
+                        to the repository.
+
+                                                *:Hgvcommit*
+:Hgvcommit              Same as |:Hgcommit| but uses a vertical split to edit
+                        the commit message.
 
 
-ABOUT                                           *lawrencium-about*
-
-Grab the latest version or report a bug on BitBucket:
-
-http://bitbucket.org/ludovicchabant/lawrencium
 
 
  vim:tw=78:et:ft=help:norl:
