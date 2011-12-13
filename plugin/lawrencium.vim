@@ -187,7 +187,7 @@ augroup end
 
 " }}}
 
-" Main Buffer Commands {{{
+" Buffer Commands Management {{{
 
 " Store the commands for Lawrencium-enabled buffers so that we can add them in
 " batch when we need to.
@@ -208,6 +208,10 @@ augroup lawrencium_main
     autocmd User Lawrencium call s:DefineMainCommands()
 augroup end
 
+" }}}
+
+" Commands Auto-Complete {{{
+
 " Auto-complete function for commands that take repo-relative file paths.
 function! s:ListRepoFiles(ArgLead, CmdLine, CursorPos) abort
     let l:matches = s:hg_repo().Glob(a:ArgLead . '*', 1)
@@ -221,6 +225,8 @@ function! s:ListRepoDirs(ArgLead, CmdLine, CursorPos) abort
     call map(l:matches, 's:normalizepath(v:val)')
     return l:matches
 endfunction
+
+" }}}
 
 " Hg {{{
 
@@ -485,8 +491,6 @@ endfunction
 
 call s:AddMainCommand("-bang Hgcommit :execute s:HgCommit(<bang>0, 0)")
 call s:AddMainCommand("-bang Hgvcommit :execute s:HgCommit(<bang>0, 1)")
-
-" }}}
 
 " }}}
 
