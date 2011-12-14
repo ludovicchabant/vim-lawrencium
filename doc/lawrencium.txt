@@ -34,7 +34,8 @@ All commands defined by |lawrencium| are local to each buffer.
 :Hg {args}              Run an arbitrary Mercurial command. Similar to :!hg
                         [args] but the '--repository' is automatically
                         specified with the root of the repository the current
-                        file belongs to.
+                        file belongs to, and it will auto-complete any
+                        standard command or option.
 
                                                 *:Hg!*
 :Hg! {args}             Like |:Hg|, but the output of the command is placed in
@@ -59,7 +60,8 @@ All commands defined by |lawrencium| are local to each buffer.
                         and <C-P>, open a file with <cr>, diff the local file
                         with the parent revision with <C-D> and <C-V>,
                         depending on whether you want a horizontal or vertical
-                        split window.
+                        split window, add an untracked file with <C-A>, and
+                        refresh the window with <C-R>.
 
                                                 *:Hgdiff*
 :Hgdiff                 Diffs the current file against its parent revision.
