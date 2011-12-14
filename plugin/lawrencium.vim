@@ -44,6 +44,16 @@ function! s:normalizepath(path)
     endif
 endfunction
 
+" Like tempname() but with some control over the filename.
+function! s:tempname(name, ...)
+    let l:path = tempname()
+    let l:result = fnamemodify(l:path, ':h') . '/' . a:name . fnamemodify(l:path, ':t')
+    if a:0 > 0
+        let l:result = l:result . a:1
+    endif
+    return l:result
+endfunction
+
 " Prints a message if debug tracing is enabled.
 function! s:trace(message, ...)
    if g:lawrencium_trace || (a:0 && a:1)
@@ -235,7 +245,7 @@ function! s:Hg(bang, ...) abort
     let l:output = call(l:repo.RunCommand, a:000, l:repo)
     if a:bang
         " Open the output of the command in a temp file.
-        let l:temp_file = tempname()
+        let l:temp_file = s:tempname('hg-output-', '.txt')
         execute 'pedit ' . l:temp_file
         wincmd p
         call append(0, l:output)
@@ -245,7 +255,61 @@ function! s:Hg(bang, ...) abort
     endif
 endfunction
 
-call s:AddMainCommand("-bang -nargs=* Hg :execute s:Hg(<bang>0, <f-args>)")
+" Include the generated HG usage file.
+let s:usage_file = expand("<sfile>:h:h") . "/resources/hg_usage.vim"
+if filereadable(s:usage_file)
+    execute "source " . s:usage_file
+else
+    echoerr "Can't find the Mercurial usage file. Auto-completion will be disabled in Lawrencium."
+endif
+
+function! s:CompleteHg(ArgLead, CmdLine, CursorPos)
+    " Don't do anything if the usage file was not sourced.
+    if !exists('g:lawrencium_hg_commands') || !exists('g:lawrencium_hg_options')
+        return []
+    endif
+
+    " a:ArgLead seems to be the number 0 when completing a minus '-'.
+    " Gotta find out why...
+    let l:arglead = a:ArgLead
+    if type(a:ArgLead) == type(0)
+        let l:arglead = '-'
+    endif
+
+    " Try completing a global option, before any command name.
+    if a:CmdLine =~# '\v^Hg(\s+\-[a-zA-Z0-9\-_]*)+$'
+        return filter(copy(g:lawrencium_hg_options), "v:val[0:strlen(l:arglead)-1] ==# l:arglead")
+    endif
+
+    " Try completing a command (note that there could be global options before
+    " the command name).
+    if a:CmdLine =~# '\v^Hg\s+(\-[a-zA-Z0-9\-_]+\s+)*[a-zA-Z]+$'
+        echom " - matched command"
+        return filter(keys(g:lawrencium_hg_commands), "v:val[0:strlen(l:arglead)-1] ==# l:arglead")
+    endif
+    
+    " Try completing a command's options.
+    let l:cmd = matchstr(a:CmdLine, '\v(^Hg\s+(\-[a-zA-Z0-9\-_]+\s+)*)@<=[a-zA-Z]+')
+    if strlen(l:cmd) > 0
+        echom " - matched command option for " . l:cmd . " with : " . l:arglead
+    endif
+    if strlen(l:cmd) > 0 && l:arglead[0] ==# '-'
+        if has_key(g:lawrencium_hg_commands, l:cmd)
+            " Return both command options and global options together.
+            let l:copts = filter(copy(g:lawrencium_hg_commands[l:cmd]), "v:val[0:strlen(l:arglead)-1] ==# l:arglead")
+            let l:gopts = filter(copy(g:lawrencium_hg_options), "v:val[0:strlen(l:arglead)-1] ==# l:arglead")
+            return l:copts + l:gopts
+        endif
+    endif
+    
+    " Just auto-complete with filenames unless it's an option.
+    if l:arglead[0] ==# '-'
+        return []
+    else
+        return s:ListRepoFiles(a:ArgLead, a:CmdLine, a:CursorPos)
+endfunction
+
+call s:AddMainCommand("-bang -complete=customlist,s:CompleteHg -nargs=* Hg :execute s:Hg(<bang>0, <f-args>)")
 
 " }}}
 
@@ -261,8 +325,7 @@ function! s:HgStatus() abort
 
     " Open a new temp buffer in the preview window, jump to it,
     " and paste the `hg status` output in there.
-    let l:temp_file = tempname()
-    let l:temp_file = fnamemodify(l:temp_file, ':h') . 'hg-status-' . fnamemodify(l:temp_file, ':t') . '.txt'
+    let l:temp_file = s:tempname('hg-status-', '.txt')
     let l:preview_height = &previewheight
     let l:status_lines = split(l:status_text, '\n')
     execute "setlocal previewheight=" . (len(l:status_lines) + 1)
@@ -289,7 +352,34 @@ function! s:HgStatus() abort
     nnoremap <buffer> <silent> <cr>  :execute <SID>HgStatus_FileEdit()<cr>
     nnoremap <buffer> <silent> <C-D> :execute <SID>HgStatus_FileDiff(0)<cr>
     nnoremap <buffer> <silent> <C-V> :execute <SID>HgStatus_FileDiff(1)<cr>
+    nnoremap <buffer> <silent> <C-A> :execute <SID>HgStatus_FileAdd()<cr>
+    nnoremap <buffer> <silent> <C-R> :execute <SID>HgStatus_Refresh()<cr>
     nnoremap <buffer> <silent> q     :bdelete<cr>
+
+    " Make sure the file is deleted with the buffer.
+    autocmd BufDelete <buffer> call s:HgStatus_CleanUp(expand('<afile>:p'))
+endfunction
+
+function! s:HgStatus_CleanUp(path) abort
+    " If the `hg status` output has been saved to disk (e.g. because of a
+    " refresh we did), let's delete it.
+    if filewritable(a:path)
+        call s:trace("Cleaning up status log: " . a:path)
+        call delete(a:path)
+    endif
+endfunction
+
+function! s:HgStatus_Refresh() abort
+    " Get the repo and the `hg status` output.
+    let l:repo = s:hg_repo()
+    let l:status_text = l:repo.RunCommand('status')
+
+    " Replace the contents of the current buffer with it, and refresh.
+    echo "Writing to " . expand('%:p')
+    let l:path = expand('%:p')
+    let l:status_lines = split(l:status_text, '\n')
+    call writefile(l:status_lines, l:path)
+    edit
 endfunction
 
 function! s:HgStatus_FileEdit() abort
@@ -306,6 +396,22 @@ function! s:HgStatus_FileEdit() abort
     endif
 endfunction
 
+function! s:HgStatus_FileAdd() abort
+    " Get the path of the file the cursor is on, and its status.
+    let l:filename = s:HgStatus_GetSelectedPath()
+    let l:status = s:HgStatus_GetSelectedStatus()
+    if l:status !=# '?'
+        echoerr "Not an untracked file: " . l:filename
+    endif
+
+    " Add the file.
+    let l:repo = s:hg_repo()
+    call l:repo.RunCommand('add', l:filename)
+
+    " Refresh the status window.
+    call s:HgStatus_Refresh()
+endfunction
+
 function! s:HgStatus_FileDiff(vertical) abort
     " Get the path of the file the cursor is on.
     let l:filename = s:HgStatus_GetSelectedPath()
@@ -320,9 +426,14 @@ function! s:HgStatus_GetSelectedPath() abort
     let l:line = getline('.')
     " Yay, awesome, Vim's regex syntax is fucked up like shit, especially for
     " look-aheads and look-behinds. See for yourself:
-    let l:filename = matchstr(l:line, '\v([MARC\!\?I ]\s)@<=.*')
+    let l:filename = matchstr(l:line, '\v(^[MARC\!\?I ]\s)@<=.*')
     let l:filename = l:repo.GetFullPath(l:filename)
     return l:filename
+endfunction
+
+function! s:HgStatus_GetSelectedStatus() abort
+    let l:line = getline('.')
+    return matchstr(l:line, '\v^[MARC\!\?I ]')
 endfunction
 
 call s:AddMainCommand("Hgstatus :execute s:HgStatus()")
@@ -418,7 +529,7 @@ function! s:HgCommit(bang, vertical) abort
     let l:repo = s:hg_repo()
 
     " Open a commit message file.
-    let l:commit_path = tempname()
+    let l:commit_path = s:tempname('hg-editor-', '.txt')
     let l:split = a:vertical ? 'vsplit' : 'split'
     execute l:split . ' ' . l:commit_path
     call append(0, ['', ''])
@@ -428,10 +539,11 @@ function! s:HgCommit(bang, vertical) abort
     " and make the buffer delete itself on exit.
     let b:mercurial_dir = l:repo.root_dir
     setlocal bufhidden=delete
+    setlocal syntax=hgcommit
     if a:bang
-        autocmd BufDelete <buffer> call s:HgCommit_Execute(expand('<afile>:p'), 1)
-    else
         autocmd BufDelete <buffer> call s:HgCommit_Execute(expand('<afile>:p'), 0)
+    else
+        autocmd BufDelete <buffer> call s:HgCommit_Execute(expand('<afile>:p'), 1)
     endif
 endfunction
 
@@ -470,7 +582,7 @@ endfunction
 function! s:HgCommit_Execute(log_file, show_output) abort
     " Check if the user actually saved a commit message.
     if !filereadable(a:log_file)
-        call s:trace("Commit message was not saved... abort commit.")
+        call s:trace("Commit message was not saved... abort commit.", 1)
         return
     endif
 
