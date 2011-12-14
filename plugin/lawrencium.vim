@@ -598,7 +598,9 @@ function! s:HgCommit_Execute(log_file, show_output) abort
     let l:output = l:repo.RunCommand('commit', '-l', a:log_file)
     if a:show_output && l:output !~# '\v%^\s*%$'
         call s:trace("Output from hg commit:", 1)
-        echom l:output
+        for l:output_line in split(l:output, '\n')
+            echom l:output_line
+        endfor
     endif
 endfunction
 
