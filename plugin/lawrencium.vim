@@ -62,6 +62,11 @@ function! s:trace(message, ...)
    endif
 endfunction
 
+" Prints an error message with 'lawrencium error' prefixed to it.
+function! s:error(message)
+    echom "lawrencium error: " . a:message
+endfunction
+
 " Throw a Lawrencium exception message.
 function! s:throw(message)
     let v:errmsg = "lawrencium: " . a:message
@@ -260,7 +265,7 @@ let s:usage_file = expand("<sfile>:h:h") . "/resources/hg_usage.vim"
 if filereadable(s:usage_file)
     execute "source " . s:usage_file
 else
-    echoerr "Can't find the Mercurial usage file. Auto-completion will be disabled in Lawrencium."
+    call s:error("Can't find the Mercurial usage file. Auto-completion will be disabled in Lawrencium.")
 endif
 
 function! s:CompleteHg(ArgLead, CmdLine, CursorPos)
@@ -401,7 +406,7 @@ function! s:HgStatus_FileAdd() abort
     let l:filename = s:HgStatus_GetSelectedPath()
     let l:status = s:HgStatus_GetSelectedStatus()
     if l:status !=# '?'
-        echoerr "Not an untracked file: " . l:filename
+        call s:error("Not an untracked file: " . l:filename)
     endif
 
     " Add the file.
@@ -582,15 +587,21 @@ endfunction
 function! s:HgCommit_Execute(log_file, show_output) abort
     " Check if the user actually saved a commit message.
     if !filereadable(a:log_file)
-        call s:trace("Commit message was not saved... abort commit.", 1)
+        call s:error("abort: Commit message not saved")
         return
     endif
 
     call s:trace("Committing with log file: " . a:log_file)
 
-    " Clean up all the 'HG:' lines from the commit message.
+    " Clean up all the 'HG:' lines from the commit message, and see if there's
+    " any message left (Mercurial does this automatically, usually, but
+    " apparently not when you feed it a log file...).
     let l:lines = readfile(a:log_file)
     call filter(l:lines, "v:val !~# '\\v^HG:'")
+    if len(filter(copy(l:lines), "v:val !~# '\\v^\\s*$'")) == 0
+        call s:error("abort: Empty commit message")
+        return
+    endif
     call writefile(l:lines, a:log_file)
 
     " Get the repo and commit with the given message.
