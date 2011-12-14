@@ -319,7 +319,7 @@ function! s:HgStatus() abort
     " Get the repo and the `hg status` output.
     let l:repo = s:hg_repo()
     let l:status_text = l:repo.RunCommand('status')
-    if l:status_text ==# '\v\%^\s*\%$'
+    if l:status_text ==# '\v%^\s*%$'
         echo "Nothing modified."
     endif
 
@@ -596,7 +596,8 @@ function! s:HgCommit_Execute(log_file, show_output) abort
     " Get the repo and commit with the given message.
     let l:repo = s:hg_repo()
     let l:output = l:repo.RunCommand('commit', '-l', a:log_file)
-    if a:show_output
+    if a:show_output && l:output !~# '\v%^\s*%$'
+        call s:trace("Output from hg commit:", 1)
         echom l:output
     endif
 endfunction
