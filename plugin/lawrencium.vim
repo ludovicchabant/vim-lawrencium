@@ -253,7 +253,7 @@ function! s:Hg(bang, ...) abort
         let l:temp_file = s:tempname('hg-output-', '.txt')
         execute 'pedit ' . l:temp_file
         wincmd p
-        call append(0, l:output)
+        call append(0, split(l:output, '\n'))
     else
         " Just print out the output of the command.
         echo l:output
