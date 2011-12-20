@@ -390,15 +390,19 @@ endfunction
 function! s:HgStatus_FileEdit() abort
     " Get the path of the file the cursor is on.
     let l:filename = s:HgStatus_GetSelectedPath()
-    
-    " Go back to the previous window and open the file there, or open an
-    " existing buffer.
+   
+    " If the file is already open in a window, jump to that window.
+    " Otherwise, jump to the previous window and open it there.
+    for nr in range(1, winnr('$'))
+        let l:br = winbufnr(nr)
+        let l:bpath = fnamemodify(bufname(l:br), ':p')
+        if l:bpath ==# l:filename
+            execute nr . 'wincmd w'
+            return
+        endif
+    endfor
     wincmd p
-    if bufexists(l:filename)
-        execute 'buffer ' . l:filename
-    else
-        execute 'edit ' . l:filename
-    endif
+    execute 'edit ' . l:filename
 endfunction
 
 function! s:HgStatus_FileAdd() abort
