@@ -491,13 +491,13 @@ function! s:HgDiff(filename, vertical, ...) abort
             execute 'edit ' . fnameescape(l:path)
         endif
         " Make it part of the diff group.
-        diffthis
+        call s:HgDiff_DiffThis()
     else
         let l:temp_file = tempname()
         call l:repo.RunCommand('cat', '-r', '"'.l:rev1.'"', '-o', l:temp_file, l:path)
         execute 'edit ' . fnameescape(l:temp_file)
         " Make it part of the diff group.
-        diffthis
+        call s:HgDiff_DiffThis()
         " Remember the repo it belongs to.
         let b:mercurial_dir = l:repo.root_dir
         " Make sure it's deleted when we move away from it.
@@ -521,6 +521,78 @@ function! s:HgDiff(filename, vertical, ...) abort
         setlocal bufhidden=delete
     endif
 endfunction
+
+function! s:HgDiff_DiffThis() abort
+    " Store some commands to run when we exit diff mode.
+    " It's needed because `diffoff` reverts those settings to their default
+    " values, instead of their previous ones.
+    if !&diff
+        call s:trace('Enabling diff mode on ' . bufname('%'))
+        let w:lawrencium_diffoff = {}
+        let w:lawrencium_diffoff['&diff'] = 0
+        let w:lawrencium_diffoff['&wrap'] = &l:wrap
+        let w:lawrencium_diffoff['&scrollopt'] = &l:scrollopt
+        let w:lawrencium_diffoff['&scrollbind'] = &l:scrollbind
+        let w:lawrencium_diffoff['&cursorbind'] = &l:cursorbind
+        let w:lawrencium_diffoff['&foldmethod'] = &l:foldmethod
+        let w:lawrencium_diffoff['&foldcolumn'] = &l:foldcolumn
+        diffthis
+    endif
+endfunction
+
+function! s:HgDiff_DiffOff(...) abort
+    " Get the window name (given as a paramter, or current window).
+    let l:nr = a:0 ? a:1 : winnr()
+
+    " Run the commands we saved in `HgDiff_DiffThis`, or just run `diffoff`.
+    let l:backup = getwinvar(l:nr, 'lawrencium_diffoff')
+    if type(l:backup) == type({}) && len(l:backup) > 0
+        call s:trace('Disabling diff mode on ' . l:nr)
+        for key in keys(l:backup)
+            call setwinvar(l:nr, key, l:backup[key])
+        endfor
+        call setwinvar(l:nr, 'lawrencium_diffoff', {})
+    else
+        call s:trace('Disabling diff mode on ' . l:nr . ' (but no true restore)')
+        diffoff
+    endif
+endfunction
+
+function! s:HgDiff_GetDiffWindows() abort
+    let l:result = []
+    for nr in range(1, winnr('$'))
+        if getwinvar(nr, '&diff')
+            call add(l:result, nr)
+        endif
+    endfor
+    return l:result
+endfunction
+
+function! s:HgDiff_CleanUp() abort
+    " If we're not leaving a diff window, do nothing.
+    if !&diff
+        return
+    endif
+
+    " If there will be only one diff window left (plus the one we're leaving),
+    " turn off diff everywhere.
+    let l:nrs = s:HgDiff_GetDiffWindows()
+    if len(l:nrs) <= 2
+        call s:trace('Disabling diff mode in ' . len(l:nrs) . ' windows.')
+        for nr in l:nrs
+            if getwinvar(nr, '&diff')
+                call s:HgDiff_DiffOff(nr)
+            endif
+        endfor
+    else
+        call s:trace('Still ' . len(l:nrs) . ' diff windows open.')
+    endif
+endfunction
+
+augroup lawrencium_diff
+  autocmd!
+  autocmd BufWinLeave * call s:HgDiff_CleanUp()
+augroup end
 
 call s:AddMainCommand("-nargs=* -complete=customlist,s:ListRepoFiles Hgdiff :execute s:HgDiff('%:p', 0, <f-args>)")
 call s:AddMainCommand("-nargs=* -complete=customlist,s:ListRepoFiles Hgvdiff :execute s:HgDiff('%:p', 1, <f-args>)")
