@@ -422,12 +422,9 @@ function! s:HgStatus_FileAdd() abort
 endfunction
 
 function! s:HgStatus_FileDiff(vertical) abort
-    " Get the path of the file the cursor is on.
-    let l:filename = s:HgStatus_GetSelectedPath()
-    
-    " Go back to the previous window and call HgDiff.
-    wincmd p
-    call s:HgDiff(l:filename, a:vertical)
+    " Open the file and run `Hgdiff` on it.
+    call s:HgStatus_FileEdit()
+    call s:HgDiff('%:p', a:vertical)
 endfunction
 
 function! s:HgStatus_GetSelectedPath() abort
