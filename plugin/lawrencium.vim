@@ -621,6 +621,7 @@ function! s:HgCommit(bang, vertical) abort
     execute l:split . ' ' . l:commit_path
     call append(0, ['', ''])
     call append(2, split(s:HgCommit_GenerateMessage(l:repo), '\n'))
+    call cursor(1, 1)
 
     " Setup the auto-command that will actually commit on write/exit,
     " and make the buffer delete itself on exit.
