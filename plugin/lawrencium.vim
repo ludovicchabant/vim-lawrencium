@@ -455,7 +455,16 @@ call s:AddMainCommand("-bang -nargs=? -complete=customlist,s:ListRepoDirs Hglcd 
 
 " Hgedit {{{
 
-call s:AddMainCommand("-bang -nargs=? -complete=customlist,s:ListRepoFiles Hgedit :edit<bang> `=s:hg_repo().GetFullPath(<q-args>)`")
+function! s:HgEdit(bang, filename) abort
+    let l:full_path = s:hg_repo().GetFullPath(a:filename)
+    if a:bang
+        execute "edit! " . l:full_path
+    else
+        execute "edit " . l:full_path
+    endif
+endfunction
+
+call s:AddMainCommand("-bang -nargs=? -complete=customlist,s:ListRepoFiles Hgedit :call s:HgEdit(<bang>0, <f-args>)")
 
 " }}}
 
