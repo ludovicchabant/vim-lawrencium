@@ -314,7 +314,7 @@ function! s:CompleteHg(ArgLead, CmdLine, CursorPos)
         return s:ListRepoFiles(a:ArgLead, a:CmdLine, a:CursorPos)
 endfunction
 
-call s:AddMainCommand("-bang -complete=customlist,s:CompleteHg -nargs=* Hg :execute s:Hg(<bang>0, <f-args>)")
+call s:AddMainCommand("-bang -complete=customlist,s:CompleteHg -nargs=* Hg :call s:Hg(<bang>0, <f-args>)")
 
 " }}}
 
@@ -354,11 +354,11 @@ function! s:HgStatus() abort
     " Add some handy mappings.
     nnoremap <buffer> <silent> <C-N> :call search('^[MARC\!\?I ]\s.', 'We')<cr>
     nnoremap <buffer> <silent> <C-P> :call search('^[MARC\!\?I ]\s.','Wbe')<cr>
-    nnoremap <buffer> <silent> <cr>  :execute <SID>HgStatus_FileEdit()<cr>
-    nnoremap <buffer> <silent> <C-D> :execute <SID>HgStatus_FileDiff(0)<cr>
-    nnoremap <buffer> <silent> <C-V> :execute <SID>HgStatus_FileDiff(1)<cr>
-    nnoremap <buffer> <silent> <C-A> :execute <SID>HgStatus_FileAdd()<cr>
-    nnoremap <buffer> <silent> <C-R> :execute <SID>HgStatus_Refresh()<cr>
+    nnoremap <buffer> <silent> <cr>  :call <SID>HgStatus_FileEdit()<cr>
+    nnoremap <buffer> <silent> <C-D> :call <SID>HgStatus_FileDiff(0)<cr>
+    nnoremap <buffer> <silent> <C-V> :call <SID>HgStatus_FileDiff(1)<cr>
+    nnoremap <buffer> <silent> <C-A> :call <SID>HgStatus_FileAdd()<cr>
+    nnoremap <buffer> <silent> <C-R> :call <SID>HgStatus_Refresh()<cr>
     nnoremap <buffer> <silent> q     :bdelete<cr>
 
     " Make sure the file is deleted with the buffer.
@@ -442,7 +442,7 @@ function! s:HgStatus_GetSelectedStatus() abort
     return matchstr(l:line, '\v^[MARC\!\?I ]')
 endfunction
 
-call s:AddMainCommand("Hgstatus :execute s:HgStatus()")
+call s:AddMainCommand("Hgstatus :call s:HgStatus()")
 
 " }}}
 
@@ -595,8 +595,8 @@ augroup lawrencium_diff
   autocmd BufWinLeave * call s:HgDiff_CleanUp()
 augroup end
 
-call s:AddMainCommand("-nargs=* -complete=customlist,s:ListRepoFiles Hgdiff :execute s:HgDiff('%:p', 0, <f-args>)")
-call s:AddMainCommand("-nargs=* -complete=customlist,s:ListRepoFiles Hgvdiff :execute s:HgDiff('%:p', 1, <f-args>)")
+call s:AddMainCommand("-nargs=* -complete=customlist,s:ListRepoFiles Hgdiff :call s:HgDiff('%:p', 0, <f-args>)")
+call s:AddMainCommand("-nargs=* -complete=customlist,s:ListRepoFiles Hgvdiff :call s:HgDiff('%:p', 1, <f-args>)")
 
 " }}}
 
@@ -688,8 +688,8 @@ function! s:HgCommit_Execute(log_file, show_output) abort
     endif
 endfunction
 
-call s:AddMainCommand("-bang Hgcommit :execute s:HgCommit(<bang>0, 0)")
-call s:AddMainCommand("-bang Hgvcommit :execute s:HgCommit(<bang>0, 1)")
+call s:AddMainCommand("-bang Hgcommit :call s:HgCommit(<bang>0, 0)")
+call s:AddMainCommand("-bang Hgvcommit :call s:HgCommit(<bang>0, 1)")
 
 " }}}
 
