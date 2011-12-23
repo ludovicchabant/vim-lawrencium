@@ -713,8 +713,11 @@ function! lawrencium#statusline(...)
     endif
     let l:prefix = (a:0 > 0 ? a:1 : '')
     let l:suffix = (a:0 > 1 ? a:2 : '')
+    let l:branch = 'default'
     let l:branch_file = s:hg_repo().GetFullPath('.hg/branch')
-    let l:branch = readfile(l:branch_file)[0]
+    if filereadable(l:branch_file)
+        let l:branch = readfile(l:branch_file)[0]
+    endif
     return l:prefix . l:branch .  l:suffix
 endfunction
 
