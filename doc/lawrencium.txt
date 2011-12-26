@@ -9,6 +9,7 @@
 
 1.  Introduction            |lawrencium-intro|
 2.  Commands                |lawrencium-commands|
+3.  Status Window           |lawrencium-status-window|
 
 
 =============================================================================
@@ -55,13 +56,9 @@ All commands defined by |lawrencium| are local to each buffer.
 
                                                 *:Hgstatus*
 :Hgstatus               Shows the output of 'hg status' in the
-                        |preview-window|.
-                        You can navigate to the next/previous file with <C-N> 
-                        and <C-P>, open a file with <cr>, diff the local file
-                        with the parent revision with <C-D> and <C-V>,
-                        depending on whether you want a horizontal or vertical
-                        split window, add an untracked file with <C-A>, and
-                        refresh the window with <C-R>.
+                        |preview-window|. Some extra-commands, along with some
+                        default mappins, are available in this window. See
+                        |lawrencium-status-window|.
 
                                                 *:Hgdiff*
 :Hgdiff                 Diffs the current file against its parent revision.
@@ -86,6 +83,49 @@ All commands defined by |lawrencium| are local to each buffer.
                         the commit message.
 
 
+
+=============================================================================
+3.  Status Window                               *lawrencium-status-window*
+
+The `hg status` window opened by Lawrencium has a few special commands 
+defined in it. Also, unless the global `lawrencium_define_mappings` is set to
+`0`, some commands are mapped to keyboard shortcuts, as detailed in the
+following descriptions.
+
+
+                                                *:Hgstatusedit*
+:Hgstatusedit           Open the file mentioned on the current line.
+                        Mapped to <cr>.
+
+                                                *:Hgstatusaddremove*
+:Hgstatusaddremove      Run `hg addremove` on the file mentioned on the
+                        current line, or on the lines currently selected in
+                        visual selection mode (see |visual-start|).
+                        Mapped to <C-A>.
+
+                                                *:Hgstatusdiff*
+:Hgstatusdiff           Open a diff window on the file mentioned on the
+                        current line, between the working directory version
+                        and the parent revision version. Similar to running
+                        |:Hgdiff| on that file.
+                        Mapped to <C-D>.
+
+                                                *:Hgstatusvdiff*
+:Hgstatusvdiff          Similar to |:Hgstatusdiff|, but use a vertical split.
+                        Similar to running |:Hgvdiff| on that file.
+                        Mapped to <C-V>.
+
+                                                *:Hgstatusrefresh*
+:Hgstatusrefresh        Refreshes the status window by running `hg status`
+                        again.
+                        Mapped to <C-R>.
+
+                                                *lawrencium-status-mappings*
+A few other mappings are available in the status window:
+
+   <C-N>                Jump to the next filename.
+   <C-P>                Jump to the previous filename.
+   q                    Quit the status window.
 
 
  vim:tw=78:et:ft=help:norl:
