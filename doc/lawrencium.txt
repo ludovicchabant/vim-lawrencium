@@ -115,6 +115,19 @@ following descriptions.
                         Similar to running |:Hgvdiff| on that file.
                         Mapped to <C-V>.
 
+                                                *:Hgstatuscommit*
+:Hgstatuscommit         Runs |:Hgcommit| on the files currently mentioned in
+                        the buffer, or in the current selection. The first 
+                        option means you can delete lines from the buffer
+                        until the remaining filenames are those you want to
+                        commit.
+                        Mapped to <C-S>.
+
+                                                *:Hgstatusvcommit*
+:Hgstatusvcommit        Similar to |:Hgstatuscommit|, but use a vertical
+                        split, as with |:Hgvcommit|.
+                        Not mapped byd default.
+
                                                 *:Hgstatusrefresh*
 :Hgstatusrefresh        Refreshes the status window by running `hg status`
                         again.
