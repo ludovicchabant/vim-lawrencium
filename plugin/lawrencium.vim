@@ -356,9 +356,6 @@ function! s:HgStatus() abort
     " Setup the buffer correctly: readonly, and with the correct repo linked
     " to it.
     let b:mercurial_dir = l:repo.root_dir
-    setlocal nomodified
-    setlocal nomodifiable
-    setlocal readonly
     setlocal buftype=nofile
     setlocal syntax=hgstatus
 
@@ -366,11 +363,13 @@ function! s:HgStatus() abort
     call s:DefineMainCommands()
 
     " Add some nice commands.
-    command! -buffer        Hgstatusedit      :call s:HgStatus_FileEdit()
-    command! -buffer -range Hgstatusaddremove :call s:HgStatus_AddRemove(<line1>, <line2>)
-    command! -buffer        Hgstatusdiff      :call s:HgStatus_Diff(0)
-    command! -buffer        Hgstatusvdiff     :call s:HgStatus_Diff(1)
-    command! -buffer        Hgstatusrefresh   :call s:HgStatus_Refresh()
+    command! -buffer          Hgstatusedit      :call s:HgStatus_FileEdit()
+    command! -buffer          Hgstatusdiff      :call s:HgStatus_Diff(0)
+    command! -buffer          Hgstatusvdiff     :call s:HgStatus_Diff(1)
+    command! -buffer          Hgstatusrefresh   :call s:HgStatus_Refresh()
+    command! -buffer -range   Hgstatusaddremove :call s:HgStatus_AddRemove(<line1>, <line2>)
+    command! -buffer -range=% -bang Hgstatuscommit  :call s:HgStatus_Commit(<line1>, <line2>, <bang>0, 0)
+    command! -buffer -range=% -bang Hgstatusvcommit :call s:HgStatus_Commit(<line1>, <line2>, <bang>0, 1)
 
     " Add some handy mappings.
     if g:lawrencium_define_mappings
@@ -380,8 +379,12 @@ function! s:HgStatus() abort
         nnoremap <buffer> <silent> <C-D> :Hgstatusdiff<cr>
         nnoremap <buffer> <silent> <C-V> :Hgstatusvdiff<cr>
         nnoremap <buffer> <silent> <C-A> :Hgstatusaddremove<cr>
+        nnoremap <buffer> <silent> <C-S> :Hgstatuscommit<cr>
         nnoremap <buffer> <silent> <C-R> :Hgstatusrefresh<cr>
         nnoremap <buffer> <silent> q     :bdelete!<cr>
+
+        vnoremap <buffer> <silent> <C-A> :Hgstatusaddremove<cr>
+        vnoremap <buffer> <silent> <C-S> :Hgstatuscommit<cr>
     endif
 
     " Make sure the file is deleted with the buffer.
@@ -441,6 +444,17 @@ function! s:HgStatus_AddRemove(linestart, lineend) abort
 
     " Refresh the status window.
     call s:HgStatus_Refresh()
+endfunction
+
+function! s:HgStatus_Commit(linestart, lineend, bang, vertical) abort
+    " Get the selected filenames.
+    let l:filenames = s:HgStatus_GetSelectedFiles(a:linestart, a:lineend, ['M', 'A', 'R'])
+    if len(l:filenames) == 0
+        call s:error("No files to commit in selection or file.")
+    endif
+
+    " Run `Hgcommit` on those paths.
+    call s:HgCommit(a:bang, a:vertical, l:filenames)
 endfunction
 
 function! s:HgStatus_Diff(vertical) abort
@@ -657,21 +671,33 @@ call s:AddMainCommand("-nargs=* -complete=customlist,s:ListRepoFiles Hgvdiff :ca
 
 " Hgcommit {{{
 
-function! s:HgCommit(bang, vertical) abort
+function! s:HgCommit(bang, vertical, ...) abort
     " Get the repo we'll be committing into.
     let l:repo = s:hg_repo()
+
+    " Get the list of files to commit.
+    " It can either be several files passed as extra parameters, or an
+    " actual list passed as the first extra parameter.
+    let l:filenames = []
+    if a:0
+        let l:filenames = a:000
+        if a:0 == 1 && type(a:1) == type([])
+            let l:filenames = a:1
+        endif
+    endif
 
     " Open a commit message file.
     let l:commit_path = s:tempname('hg-editor-', '.txt')
     let l:split = a:vertical ? 'vsplit' : 'split'
     execute l:split . ' ' . l:commit_path
     call append(0, ['', ''])
-    call append(2, split(s:HgCommit_GenerateMessage(l:repo), '\n'))
+    call append(2, split(s:HgCommit_GenerateMessage(l:repo, l:filenames), '\n'))
     call cursor(1, 1)
 
     " Setup the auto-command that will actually commit on write/exit,
     " and make the buffer delete itself on exit.
     let b:mercurial_dir = l:repo.root_dir
+    let b:lawrencium_commit_files = l:filenames
     setlocal bufhidden=delete
     setlocal syntax=hgcommit
     if a:bang
@@ -694,7 +720,7 @@ let s:hg_status_messages = {
     \' ': '',
     \}
 
-function! s:HgCommit_GenerateMessage(repo) abort
+function! s:HgCommit_GenerateMessage(repo, filenames) abort
     let l:msg  = "HG: Enter commit message. Lines beginning with 'HG:' are removed.\n"
     let l:msg .= "HG: Leave message empty to abort commit.\n"
     let l:msg .= "HG: Write and quit buffer to proceed.\n"
@@ -702,7 +728,11 @@ function! s:HgCommit_GenerateMessage(repo) abort
     let l:msg .= "HG: user: " . split(a:repo.RunCommand('showconfig ui.username'), '\n')[0] . "\n"
     let l:msg .= "HG: branch '" . split(a:repo.RunCommand('branch'), '\n')[0] . "'\n"
 
-    let l:status_lines = split(a:repo.RunCommand('status'), "\n")
+    if len(a:filenames)
+        let l:status_lines = split(a:repo.RunCommand('status', a:filenames), "\n")
+    else
+        let l:status_lines = split(a:repo.RunCommand('status'), "\n")
+    endif
     for l:line in l:status_lines
         if l:line ==# ''
             continue
@@ -737,7 +767,9 @@ function! s:HgCommit_Execute(log_file, show_output) abort
 
     " Get the repo and commit with the given message.
     let l:repo = s:hg_repo()
-    let l:output = l:repo.RunCommand('commit', '-l', a:log_file)
+    let l:hg_args = ['-l', a:log_file]
+    call extend(l:hg_args, b:lawrencium_commit_files)
+    let l:output = l:repo.RunCommand('commit', l:hg_args)
     if a:show_output && l:output !~# '\v%^\s*%$'
         call s:trace("Output from hg commit:", 1)
         for l:output_line in split(l:output, '\n')
@@ -746,8 +778,8 @@ function! s:HgCommit_Execute(log_file, show_output) abort
     endif
 endfunction
 
-call s:AddMainCommand("-bang Hgcommit :call s:HgCommit(<bang>0, 0)")
-call s:AddMainCommand("-bang Hgvcommit :call s:HgCommit(<bang>0, 1)")
+call s:AddMainCommand("-bang -nargs=* -complete=customlist,s:ListRepoFiles Hgcommit :call s:HgCommit(<bang>0, 0, <f-args>)")
+call s:AddMainCommand("-bang -nargs=* -complete=customlist,s:ListRepoFiles Hgvcommit :call s:HgCommit(<bang>0, 1, <f-args>)")
 
 " }}}
 
