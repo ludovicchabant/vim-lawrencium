@@ -11,7 +11,7 @@ Installation
 The recommended method to install Lawrencium is to use [Pathogen][], also from Tim Pope:
 
     cd ~/.vim/bundle
-    hg clone https://bitbucket.org/ludovicchabant/lawrencium
+    hg clone https://bitbucket.org/ludovicchabant/vim-lawrencium
 
 You can then update the help tags with `:call pathogen#helptags()` and browse Lawrencium's help pages with `:help lawrencium`.
 
