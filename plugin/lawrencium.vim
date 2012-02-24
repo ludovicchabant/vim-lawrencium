@@ -783,6 +783,29 @@ call s:AddMainCommand("-bang -nargs=* -complete=customlist,s:ListRepoFiles Hgvco
 
 " }}}
 
+" Hgrevert {{{
+
+function! s:HgRevert(bang, ...) abort
+    " Get the files to revert.
+    let l:filenames = a:000
+    if a:0 == 0
+        let l:filenames = [ expand('%:p') ]
+    endif
+    if a:bang
+        call insert(l:filenames, '--no-backup', 0)
+    endif
+
+    " Get the repo.
+    let l:repo = s:hg_repo()
+
+    " Run the command.
+    call l:repo.RunCommand('revert', l:filenames)
+endfunction
+
+call s:AddMainCommand("-bang -nargs=* -complete=customlist,s:ListRepoFiles Hgrevert :call s:HgRevert(<bang>0, <f-args>)")
+
+" }}}
+
 " Autoload Functions {{{
 
 " Prints a summary of the current repo (if any) that's appropriate for
