@@ -82,6 +82,14 @@ All commands defined by |lawrencium| are local to each buffer.
 :Hgvcommit              Same as |:Hgcommit| but uses a vertical split to edit
                         the commit message.
 
+:Hgrevert {files}                               *:Hgrevert*
+                        Reverts the given files (in repo-relative paths). If no
+                        file are given, reverts the current file.
+
+:Hgrevert! {files}                              *:Hgrevert!*
+                        Same as |:Hgrevert| but with the --no-backup option
+                        given to prevent a .orig backup file from being
+                        created.
 
 
 =============================================================================
