@@ -141,6 +141,19 @@ following descriptions.
                         again.
                         Mapped to <C-R>.
 
+                                                *:Hgstatusqnew*
+:Hgstatusqnew {patch} {message}.
+                        If you have the 'mq' extension enabled, creates a new
+                        patch with the file currently mentioned in the buffer,
+                        or in the current selection. You must give a patch name,
+                        and may optionally write a commit message for the patch
+                        (without surrounding quotes).
+
+                                                *:Hgstatusqrefresh*
+:Hgstatusqrefresh       If you have the 'mq' extension enabled, refreshes the
+                        current patch with the files currently mentioned in the
+                        buffer, or in the current selection.
+
                                                 *lawrencium-status-mappings*
 A few other mappings are available in the status window:
 

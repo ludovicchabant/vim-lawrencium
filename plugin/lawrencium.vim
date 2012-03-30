@@ -370,6 +370,8 @@ function! s:HgStatus() abort
     command! -buffer -range   Hgstatusaddremove :call s:HgStatus_AddRemove(<line1>, <line2>)
     command! -buffer -range=% -bang Hgstatuscommit  :call s:HgStatus_Commit(<line1>, <line2>, <bang>0, 0)
     command! -buffer -range=% -bang Hgstatusvcommit :call s:HgStatus_Commit(<line1>, <line2>, <bang>0, 1)
+    command! -buffer -range=% -nargs=+ Hgstatusqnew :call s:HgStatus_QNew(<line1>, <line2>, <f-args>)
+    command! -buffer -range=% Hgstatusqrefresh      :call s:HgStatus_QRefresh(<line1>, <line2>)
 
     " Add some handy mappings.
     if g:lawrencium_define_mappings
@@ -462,6 +464,38 @@ function! s:HgStatus_Diff(vertical) abort
     call s:HgStatus_FileEdit()
     call s:HgDiff('%:p', a:vertical)
 endfunction
+
+function! s:HgStatus_QNew(linestart, lineend, patchname, ...) abort
+    " Get the selected filenames.
+    let l:filenames = s:HgStatus_GetSelectedFiles(a:linestart, a:lineend, ['M', 'A', 'R'])
+    if len(l:filenames) == 0
+        call s:error("No files in selection or file to create patch.")
+    endif
+
+    " Run `Hg qnew` on those paths.
+    let l:repo = s:hg_repo()
+    call insert(l:filenames, a:patchname, 0)
+    if a:0 > 0
+        call insert(l:filenames, '-m', 0)
+        let l:message = '"' . join(a:000, ' ') . '"'
+        call insert(l:filenames, l:message, 1)
+    endif
+    call l:repo.RunCommand('qnew', l:filenames)
+endfunction
+
+function! s:HgStatus_QRefresh(linestart, lineend) abort
+    " Get the selected filenames.
+    let l:filenames = s:HgStatus_GetSelectedFiles(a:linestart, a:lineend, ['M', 'A', 'R'])
+    if len(l:filenames) == 0
+        call s:error("No files in selection or file to refresh the patch.")
+    endif
+
+    " Run `Hg qrefresh` on those paths.
+    let l:repo = s:hg_repo()
+    call insert(l:filenames, '-s', 0)
+    call l:repo.RunCommand('qrefresh', l:filenames)
+endfunction
+
 
 function! s:HgStatus_GetSelectedFile() abort
     let l:filenames = s:HgStatus_GetSelectedFiles()
