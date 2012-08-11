@@ -594,7 +594,7 @@ function! s:HgDiff(filename, vertical, ...) abort
         call s:HgDiff_DiffThis()
     else
         let l:temp_file = tempname()
-        call l:repo.RunCommand('cat', '-r', '"'.l:rev1.'"', '-o', l:temp_file, l:path)
+        call l:repo.RunCommand('cat', '-r', '"'.l:rev1.'"', '-o', '"'.l:temp_file.'"', '"'.l:path.'"')
         execute 'edit ' . fnameescape(l:temp_file)
         " Make it part of the diff group.
         call s:HgDiff_DiffThis()
@@ -615,7 +615,7 @@ function! s:HgDiff(filename, vertical, ...) abort
         execute l:diffsplit . ' ' . fnameescape(l:path)
     else
         let l:temp_file = tempname()
-        call l:repo.RunCommand('cat', '-r', '"'.l:rev2.'"', '-o', l:temp_file, l:path)
+        call l:repo.RunCommand('cat', '-r', '"'.l:rev2.'"', '-o', '"'.l:temp_file.'"', '"'.l:path.'"')
         execute l:diffsplit . ' ' . fnameescape(l:temp_file)
         " Remember the repo it belongs to.
         let b:mercurial_dir = l:repo.root_dir
