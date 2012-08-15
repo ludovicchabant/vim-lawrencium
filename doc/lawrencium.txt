@@ -37,6 +37,11 @@ All commands defined by |lawrencium| are local to each buffer.
                         specified with the root of the repository the current
                         file belongs to, and it will auto-complete any
                         standard command or option.
+                        
+                        Also, unless the `lawrencium_auto_cd` global is set to
+                        `0`, it will temporarily set the current directory to be
+                        the root of the repository so that auto-completed
+                        filenames work out of the box.
 
                                                 *:Hg!*
 :Hg! {args}             Like |:Hg|, but the output of the command is placed in

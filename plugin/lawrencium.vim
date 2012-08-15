@@ -20,6 +20,10 @@ if !exists('g:lawrencium_hg_executable')
     let g:lawrencium_hg_executable = 'hg'
 endif
 
+if !exists('g:lawrencium_auto_cd')
+    let g:lawrencium_auto_cd = 1
+endif
+
 if !exists('g:lawrencium_trace')
     let g:lawrencium_trace = 0
 endif
@@ -257,7 +261,15 @@ endfunction
 
 function! s:Hg(bang, ...) abort
     let l:repo = s:hg_repo()
+    if g:lawrencium_auto_cd:
+        " Temporary set the current directory to the root of the repo
+        " to make auto-completed paths work magically.
+        execute 'cd! ' . l:repo.root_dir
+    endif
     let l:output = call(l:repo.RunCommand, a:000, l:repo)
+    if g:lawrencium_auto_cd:
+        execute 'cd! -'
+    endif
     if a:bang
         " Open the output of the command in a temp file.
         let l:temp_file = s:tempname('hg-output-', '.txt')
