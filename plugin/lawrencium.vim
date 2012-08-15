@@ -261,13 +261,13 @@ endfunction
 
 function! s:Hg(bang, ...) abort
     let l:repo = s:hg_repo()
-    if g:lawrencium_auto_cd:
+    if g:lawrencium_auto_cd
         " Temporary set the current directory to the root of the repo
         " to make auto-completed paths work magically.
         execute 'cd! ' . l:repo.root_dir
     endif
     let l:output = call(l:repo.RunCommand, a:000, l:repo)
-    if g:lawrencium_auto_cd:
+    if g:lawrencium_auto_cd
         execute 'cd! -'
     endif
     if a:bang
