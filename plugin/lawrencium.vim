@@ -62,6 +62,14 @@ function! s:tempname(name, ...)
     return l:result
 endfunction
 
+" Delete a temporary file if it exists.
+function! s:clean_tempfile(path)
+    if filewritable(a:path)
+        call s:trace("Cleaning up temporary file: " . a:path)
+        call delete(a:path)
+    endif
+endfunction
+
 " Prints a message if debug tracing is enabled.
 function! s:trace(message, ...)
    if g:lawrencium_trace || (a:0 && a:1)
@@ -96,6 +104,31 @@ function! s:find_repo_root(path)
     call s:throw("No Mercurial repository found above: " . a:path)
 endfunction
 
+" Given a Lawrencium path (e.g: 'lawrencium:///repo/root_dir@foo/bar/file.py//34'), extract
+" the repository root, relative file path and revision number/changeset ID.
+function! s:parse_lawrencium_path(lawrencium_path)
+    let l:repo_path = a:lawrencium_path
+    if l:repo_path =~? '^lawrencium://'
+        let l:repo_path = strpart(l:repo_path, strlen('lawrencium://'))
+    endif
+
+    let l:root_dir = ''
+    let l:at_idx = stridx(l:repo_path, '@')
+    if l:at_idx >= 0
+        let l:root_dir = strpart(l:repo_path, 0, l:at_idx)
+        let l:repo_path = strpart(l:repo_path, l:at_idx + 1)
+    endif
+    
+    let l:rev = matchstr(l:repo_path, '\v//[0-9a-f]+$')
+    if l:rev !=? ''
+        let l:repo_path = strpart(l:repo_path, 0, strlen(l:repo_path) - strlen(l:rev))
+        let l:rev = strpart(l:rev, 2)
+    endif
+
+    let l:result = { 'root': l:root_dir, 'path': l:repo_path, 'rev': l:rev }
+    return l:result
+endfunction
+
 " }}}
 
 " Mercurial Repository {{{
@@ -106,7 +139,7 @@ endfunction
 " The prototype dictionary.
 let s:HgRepo = {}
 
-" Constructor
+" Constructor.
 function! s:HgRepo.New(path) abort
     let l:newRepo = copy(self)
     let l:newRepo.root_dir = s:find_repo_root(a:path)
@@ -114,7 +147,7 @@ function! s:HgRepo.New(path) abort
     return l:newRepo
 endfunction
 
-" Gets a full path given a repo-relative path
+" Gets a full path given a repo-relative path.
 function! s:HgRepo.GetFullPath(path) abort
     let l:root_dir = self.root_dir
     if a:path =~# '\v^[/\\]'
@@ -144,8 +177,8 @@ function! s:HgRepo.Glob(pattern, ...) abort
     return l:matches
 endfunction
 
-" Runs a Mercurial command in the repo
-function! s:HgRepo.RunCommand(command, ...) abort
+" Gets a full Mercurial command.
+function! s:HgRepo.GetCommand(command, ...) abort
     " If there's only one argument, and it's a list, then use that as the
     " argument list.
     let l:arg_list = a:000
@@ -154,14 +187,21 @@ function! s:HgRepo.RunCommand(command, ...) abort
     endif
     let l:hg_command = g:lawrencium_hg_executable . ' --repository ' . shellescape(s:stripslash(self.root_dir))
     let l:hg_command = l:hg_command . ' ' . a:command . ' ' . join(l:arg_list, ' ')
+    return l:hg_command
+endfunction
+
+" Runs a Mercurial command in the repo.
+function! s:HgRepo.RunCommand(command, ...) abort
+    let l:all_args = [a:command] + a:000
+    let l:hg_command = call(self['GetCommand'], l:all_args, self)
     call s:trace("Running Mercurial command: " . l:hg_command)
     return system(l:hg_command)
 endfunction
 
-" Repo cache map
+" Repo cache map.
 let s:buffer_repos = {}
 
-" Get a cached repo
+" Get a cached repo.
 function! s:hg_repo(...) abort
     " Use the given path, or the mercurial directory of the current buffer.
     if a:0 == 0
@@ -402,16 +442,7 @@ function! s:HgStatus() abort
     endif
 
     " Make sure the file is deleted with the buffer.
-    autocmd BufDelete <buffer> call s:HgStatus_CleanUp(expand('<afile>:p'))
-endfunction
-
-function! s:HgStatus_CleanUp(path) abort
-    " If the `hg status` output has been saved to disk (e.g. because of a
-    " refresh we did), let's delete it.
-    if filewritable(a:path)
-        call s:trace("Cleaning up status log: " . a:path)
-        call delete(a:path)
-    endif
+    autocmd BufDelete <buffer> call s:clean_tempfile(expand('<afile>:p'))
 endfunction
 
 function! s:HgStatus_Refresh() abort
@@ -841,14 +872,102 @@ function! s:HgRevert(bang, ...) abort
         call insert(l:filenames, '--no-backup', 0)
     endif
 
-    " Get the repo.
+    " Get the repo and run the command.
     let l:repo = s:hg_repo()
-
-    " Run the command.
     call l:repo.RunCommand('revert', l:filenames)
 endfunction
 
 call s:AddMainCommand("-bang -nargs=* -complete=customlist,s:ListRepoFiles Hgrevert :call s:HgRevert(<bang>0, <f-args>)")
+
+" }}}
+
+" Hglog {{{
+
+function! s:HgLog(...) abort
+    let l:filepath = expand('%:p')
+    if a:0 == 1
+        let l:filepath = a:1
+    endif
+
+    " Get the repo and get the command.
+    let l:repo = s:hg_repo()
+    let l:log_command = l:repo.GetCommand('log', l:filepath, '--template', '"{rev}\t{desc|firstline}\n"')
+
+    " Open a new temp buffer in the preview window, jump to it,
+    " and paste the `hg log` output in there.
+    let l:temp_file = s:tempname('hg-log-', '.txt')
+    execute "pedit " . l:temp_file
+    wincmd p
+    execute "read !" . escape(l:log_command, '%#\')
+
+    " Setup the buffer correctly: readonly, and with the correct repo linked
+    " to it, and deleted on close.
+    let b:mercurial_dir = l:repo.root_dir
+    let b:mercurial_logged_file = l:filepath
+    setlocal bufhidden=delete
+    setlocal buftype=nofile
+    setlocal syntax=hglog
+
+    " Make commands available.
+    call s:DefineMainCommands()
+
+    " Add some other nice commands and mappings.
+    command! -buffer -nargs=? Hglogrevedit :call s:HgLog_FileRevEdit(<f-args>)
+    if g:lawrencium_define_mappings
+        nnoremap <buffer> <silent> <cr>  :Hglogrevedit<cr>
+        nnoremap <buffer> <silent> q     :bdelete!<cr>
+    endif
+
+    " Make sure the file is deleted with the buffer.
+    autocmd BufDelete <buffer> call s:clean_tempfile(expand('<afile>:p'))
+endfunction
+
+function! s:HgLog_FileRevEdit(...)
+    if a:0 > 0
+        " Revision was given manually.
+        let l:rev = a:1
+    else
+        " Revision should be parsed from the current line in the log.
+        let l:rev = s:HgLog_GetSelectedRev()
+    endif
+    let l:path = 'lawrencium://' . b:mercurial_dir . '@' . b:mercurial_logged_file . '//' . l:rev
+    execute 'edit ' . l:path
+endfunction
+
+function! s:HgLog_GetSelectedRev() abort
+    let l:line = getline('.')
+    " Behold, Vim's look-ahead regex syntax again! WTF.
+    let l:rev = matchstr(l:line, '\v^(\d+)(\s)@=')
+    if l:rev == ''
+        call s:throw("Can't parse revision number from line: " . l:line)
+    endif
+    return l:rev
+endfunction
+
+call s:AddMainCommand("-nargs=? -complete=customlist,s:ListRepoFiles Hglog :call s:HgLog(<f-args>)")
+
+" }}}
+
+" Lawrencium files {{{
+
+function! s:ReadFileRevision(path) abort
+    let l:comps = s:parse_lawrencium_path(a:path)
+    if l:comps['root'] == ''
+        call s:throw("Can't get repository root from: " . a:path)
+    endif
+    let l:repo = s:HgRepo.New(l:comps['root'])
+    if l:comps['rev'] == ''
+        execute 'read !' . escape(l:repo.GetCommand('cat', l:comps['path']), '%#\')
+    else
+        execute 'read !' . escape(l:repo.GetCommand('cat', '-r', l:comps['rev'], l:comps['path']), '%#\')
+    endif
+    return ''
+endfunction
+
+augroup lawrencium_files
+  autocmd!
+  autocmd BufReadCmd  lawrencium://**//[0-9a-f][0-9a-f]* exe s:ReadFileRevision(expand('<amatch>'))
+augroup END
 
 " }}}
 
