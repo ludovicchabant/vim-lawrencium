@@ -314,7 +314,7 @@ function! s:Hg(bang, ...) abort
         " Open the output of the command in a temp file.
         let l:temp_file = s:tempname('hg-output-', '.txt')
         execute 'pedit ' . l:temp_file
-        wincmd p
+        wincmd P
         call append(0, split(l:output, '\n'))
     else
         " Just print out the output of the command.
@@ -397,7 +397,7 @@ function! s:HgStatus() abort
     let l:status_lines = split(l:status_text, '\n')
     execute "setlocal previewheight=" . (len(l:status_lines) + 1)
     execute "pedit " . l:temp_file
-    wincmd p
+    wincmd P
     call append(0, l:status_lines)
     call cursor(1, 1)
     " Make it a nice size. 
@@ -897,7 +897,7 @@ function! s:HgLog(...) abort
     " and paste the `hg log` output in there.
     let l:temp_file = s:tempname('hg-log-', '.txt')
     execute "pedit " . l:temp_file
-    wincmd p
+    wincmd P
     execute "read !" . escape(l:log_command, '%#\')
 
     " Setup the buffer correctly: readonly, and with the correct repo linked
