@@ -32,6 +32,10 @@ if !exists('g:lawrencium_define_mappings')
     let g:lawrencium_define_mappings = 1
 endif
 
+if !exists('g:lawrencium_hg_bang_edit_command')
+    let g:lawrencium_hg_bang_edit_command = 'pedit'
+endif
+
 " }}}
 
 " Utility {{{
@@ -313,9 +317,23 @@ function! s:Hg(bang, ...) abort
     if a:bang
         " Open the output of the command in a temp file.
         let l:temp_file = s:tempname('hg-output-', '.txt')
-        execute 'pedit ' . l:temp_file
+        execute g:lawrencium_hg_bang_edit_command . ' ' . l:temp_file
         wincmd p
         call append(0, split(l:output, '\n'))
+        call cursor(1, 1)
+
+        " Make it a temp buffer
+        setlocal bufhidden=delete
+        setlocal buftype=nofile
+
+        " Try to find a nice syntax to set given the current command.
+        let l:command_name = s:GetHgCommandName(a:000)
+        if l:command_name != '' && exists('g:lawrencium_hg_commands_file_types')
+            let l:file_type = get(g:lawrencium_hg_commands_file_types, l:command_name, '')
+            if l:file_type != ''
+                execute 'setlocal ft=' . l:file_type
+            endif
+        endif
     else
         " Just print out the output of the command.
         echo l:output
@@ -328,6 +346,12 @@ if filereadable(s:usage_file)
     execute "source " . s:usage_file
 else
     call s:error("Can't find the Mercurial usage file. Auto-completion will be disabled in Lawrencium.")
+endif
+
+" Include the command file type mappings.
+let s:file_type_mappings = expand("<sfile>:h:h") . '/resources/hg_command_file_types.vim'
+if filereadable(s:file_type_mappings)
+    execute "source " . s:file_type_mappings
 endif
 
 function! s:CompleteHg(ArgLead, CmdLine, CursorPos)
@@ -351,15 +375,11 @@ function! s:CompleteHg(ArgLead, CmdLine, CursorPos)
     " Try completing a command (note that there could be global options before
     " the command name).
     if a:CmdLine =~# '\v^Hg\s+(\-[a-zA-Z0-9\-_]+\s+)*[a-zA-Z]+$'
-        echom " - matched command"
         return filter(keys(g:lawrencium_hg_commands), "v:val[0:strlen(l:arglead)-1] ==# l:arglead")
     endif
     
     " Try completing a command's options.
     let l:cmd = matchstr(a:CmdLine, '\v(^Hg\s+(\-[a-zA-Z0-9\-_]+\s+)*)@<=[a-zA-Z]+')
-    if strlen(l:cmd) > 0
-        echom " - matched command option for " . l:cmd . " with : " . l:arglead
-    endif
     if strlen(l:cmd) > 0 && l:arglead[0] ==# '-'
         if has_key(g:lawrencium_hg_commands, l:cmd)
             " Return both command options and global options together.
@@ -374,6 +394,15 @@ function! s:CompleteHg(ArgLead, CmdLine, CursorPos)
         return []
     else
         return s:ListRepoFiles(a:ArgLead, a:CmdLine, a:CursorPos)
+endfunction
+
+function! s:GetHgCommandName(args) abort
+    for l:a in a:args
+        if stridx(l:a, '-') != 0
+            return l:a
+        endif
+    endfor
+    return ''
 endfunction
 
 call s:AddMainCommand("-bang -complete=customlist,s:CompleteHg -nargs=* Hg :call s:Hg(<bang>0, <f-args>)")
@@ -451,7 +480,6 @@ function! s:HgStatus_Refresh() abort
     let l:status_text = l:repo.RunCommand('status')
 
     " Replace the contents of the current buffer with it, and refresh.
-    echo "Writing to " . expand('%:p')
     let l:path = expand('%:p')
     let l:status_lines = split(l:status_text, '\n')
     call writefile(l:status_lines, l:path)

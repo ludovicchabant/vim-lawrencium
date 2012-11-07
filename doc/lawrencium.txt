@@ -1,6 +1,23 @@
 *lawrencium.txt*  Mercurial wrapper for VIM
 
 
+            LLLLLLLLLLL                                                      ~
+            L:::::::::L                                                      ~
+            L:::::::::L                                                      ~
+            LL:::::::LL                                                      ~
+              L:::::L              rrrrr   rrrrrrrrr                         ~
+              L:::::L              r::::rrr:::::::::r                        ~
+              L:::::L              r:::::::::::::::::r                       ~
+              L:::::L              rr::::::rrrrr::::::r                      ~
+              L:::::L               r:::::r     r:::::r                      ~
+              L:::::L               r:::::r     rrrrrrr                      ~
+              L:::::L               r:::::r                                  ~
+              L:::::L         LLLLLLr:::::r                                  ~
+            LL:::::::LLLLLLLLL:::::Lr:::::r                                  ~
+            L::::::::::::::::::::::Lr:::::r                                  ~
+            L::::::::::::::::::::::Lr:::::r                                  ~
+            LLLLLLLLLLLLLLLLLLLLLLLLrrrrrrr                                  ~
+
                 LAWRENCIUM REFERENCE MANUAL
                     by Ludovic Chabant
 
@@ -10,6 +27,7 @@
 1.  Introduction            |lawrencium-intro|
 2.  Commands                |lawrencium-commands|
 3.  Status Window           |lawrencium-status-window|
+4.  Global Settings         |lawrencium-global-settings|
 
 
 =============================================================================
@@ -38,14 +56,21 @@ All commands defined by |lawrencium| are local to each buffer.
                         file belongs to, and it will auto-complete any
                         standard command or option.
                         
-                        Also, unless the `lawrencium_auto_cd` global is set to
+                        Also, unless the |lawrencium_auto_cd| global is set to
                         `0`, it will temporarily set the current directory to be
                         the root of the repository so that auto-completed
                         filenames work out of the box.
 
                                                 *:Hg!*
 :Hg! {args}             Like |:Hg|, but the output of the command is placed in
-                        a temp file and edited in the |preview-window|.
+                        a temp file and edited in the |preview-window|, unless
+                        the |lawrencium_hg_bang_edit_command| global setting
+                        specifies that another type of window or buffer should
+                        be used.
+
+                        Once the output is open in a buffer, Lawrencium will
+                        try to set the file type according to the Mercurial
+                        command that was run. See |lawrencium_hg_commands_file_types|.
 
                                                 *:Hgcd*
 :Hgcd[!] {path}         |:cd| relative to the root of the repository.
@@ -101,7 +126,7 @@ All commands defined by |lawrencium| are local to each buffer.
 3.  Status Window                               *lawrencium-status-window*
 
 The `hg status` window opened by Lawrencium has a few special commands 
-defined in it. Also, unless the global `lawrencium_define_mappings` is set to
+defined in it. Also, unless the global |lawrencium_define_mappings| is set to
 `0`, some commands are mapped to keyboard shortcuts, as detailed in the
 following descriptions.
 
@@ -165,6 +190,55 @@ A few other mappings are available in the status window:
    <C-N>                Jump to the next filename.
    <C-P>                Jump to the previous filename.
    q                    Quit the status window.
+
+
+
+=============================================================================
+4.  Global Settings                             *lawrencium-global-settings*
+
+The following global settings can be defined in your |vimrc| to change the
+default behaviour of Lawrencium.
+
+                                                *lawrencium_hg_executable*
+g:lawrencium_hg_executable
+                        Defines the executable to run when running Mercurial
+                        commands.
+                        Defaults to simply `hg`.
+
+                                                *lawrencium_auto_cd*
+g:lawrencium_auto_cd    Specifies whether the current working directory should 
+                        be set to the repository's root while running |:Hg|
+                        commands so that auto-completion works magically with
+                        repository relative paths.
+                        Defaults to `1`.
+
+                                                *lawrencium_define_mappings*
+g:lawrencium_define_mappings
+                        Specifies whether Lawrencium should define default
+                        keyboard shortcuts.
+                        Defaults to `1`.
+
+                                                *lawrencium_hg_bang_edit_command*
+g:lawrencium_hg_bang_edit_command
+                        Defines the Vim command to run when using the |:Hg!|
+                        command (with the bang) in order to show the output.
+                        
+                        Defaults to |pedit|, which opens the output of the
+                        command in the |preview-window|. A good alternative
+                        is to use |edit|, to open the output in a normal
+                        buffer.
+
+                                                *lawrencium_hg_commands_file_types*
+g:lawrencium_hg_commands_file_types
+                        Defines the |file-types| that Lawrencium should use
+                        when editing the output of |:Hg!| based on the
+                        Mercurial command that was used.
+                        
+                        By default, unless overridden, the following commands
+                        map to the following file types:
+
+                        diff                diff
+                        graphlog            graphlog
 
 
  vim:tw=78:et:ft=help:norl:
