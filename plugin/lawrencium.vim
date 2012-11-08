@@ -32,10 +32,6 @@ if !exists('g:lawrencium_define_mappings')
     let g:lawrencium_define_mappings = 1
 endif
 
-if !exists('g:lawrencium_hg_bang_edit_command')
-    let g:lawrencium_hg_bang_edit_command = 'pedit'
-endif
-
 " }}}
 
 " Utility {{{
@@ -48,12 +44,21 @@ endfunction
 " Normalizes the slashes in a path.
 function! s:normalizepath(path)
     if exists('+shellslash') && &shellslash
-        return substitute(a:path, '\\', '/', '')
+        return substitute(a:path, '\v/', '\\', 'g')
     elseif has('win32')
-        return substitute(a:path, '/', '\\', '')
+        return substitute(a:path, '\v/', '\\', 'g')
     else
         return a:path
     endif
+endfunction
+
+" Shell-slashes the path (opposite of `normalizepath`).
+function! s:shellslash(path)
+  if exists('+shellslash') && !&shellslash
+    return substitute(a:path, '\v\\', '/', 'g')
+  else
+    return a:path
+  endif
 endfunction
 
 " Like tempname() but with some control over the filename.
@@ -111,8 +116,8 @@ endfunction
 " Given a Lawrencium path (e.g: 'lawrencium:///repo/root_dir@foo/bar/file.py//34'), extract
 " the repository root, relative file path and revision number/changeset ID.
 function! s:parse_lawrencium_path(lawrencium_path)
-    let l:repo_path = a:lawrencium_path
-    if l:repo_path =~? '^lawrencium://'
+    let l:repo_path = s:shellslash(a:lawrencium_path)
+    if l:repo_path =~? '\v^lawrencium://'
         let l:repo_path = strpart(l:repo_path, strlen('lawrencium://'))
     endif
 
@@ -317,8 +322,8 @@ function! s:Hg(bang, ...) abort
     if a:bang
         " Open the output of the command in a temp file.
         let l:temp_file = s:tempname('hg-output-', '.txt')
-        execute g:lawrencium_hg_bang_edit_command . ' ' . l:temp_file
-        wincmd p
+        split
+        execute 'edit ' . l:temp_file
         call append(0, split(l:output, '\n'))
         call cursor(1, 1)
 
@@ -419,18 +424,17 @@ function! s:HgStatus() abort
         echo "Nothing modified."
     endif
 
-    " Open a new temp buffer in the preview window, jump to it,
+    " Open a new temp buffer in a new window, jump to it,
     " and paste the `hg status` output in there.
     let l:temp_file = s:tempname('hg-status-', '.txt')
-    let l:preview_height = &previewheight
     let l:status_lines = split(l:status_text, '\n')
-    execute "setlocal previewheight=" . (len(l:status_lines) + 1)
-    execute "pedit " . l:temp_file
-    wincmd p
+    split
+    execute "setlocal winfixheight"
+    execute "setlocal winheight=" . (len(l:status_lines) + 1)
+    execute "resize " . (len(l:status_lines) + 1)
+    execute "edit " . l:temp_file
     call append(0, l:status_lines)
     call cursor(1, 1)
-    " Make it a nice size. 
-    execute "setlocal previewheight=" . l:preview_height
     " Make sure it's deleted when we exit the window.
     setlocal bufhidden=delete
     
@@ -917,16 +921,17 @@ function! s:HgLog(...) abort
         let l:filepath = a:1
     endif
 
-    " Get the repo and get the command.
+    " Get the repo and run the command.
     let l:repo = s:hg_repo()
-    let l:log_command = l:repo.GetCommand('log', l:filepath, '--template', '"{rev}\t{desc|firstline}\n"')
+    let l:output = l:repo.RunCommand('log', l:filepath, '--template', '"{rev}\t{desc|firstline}\n"')
 
     " Open a new temp buffer in the preview window, jump to it,
     " and paste the `hg log` output in there.
     let l:temp_file = s:tempname('hg-log-', '.txt')
     execute "pedit " . l:temp_file
-    wincmd p
-    execute "read !" . escape(l:log_command, '%#\')
+    wincmd P
+    call append(0, split(l:output, '\n'))
+    call cursor(1, 1)
 
     " Setup the buffer correctly: readonly, and with the correct repo linked
     " to it, and deleted on close.
@@ -946,8 +951,51 @@ function! s:HgLog(...) abort
         nnoremap <buffer> <silent> q     :bdelete!<cr>
     endif
 
-    " Make sure the file is deleted with the buffer.
-    autocmd BufDelete <buffer> call s:clean_tempfile(expand('<afile>:p'))
+    " Clean up when the log buffer is deleted.
+    autocmd BufDelete <buffer> call s:HgLog_Delete(expand('<afile>:p'))
+endfunction
+
+function! s:HgLog_Delete(path)
+    let l:orignr = winnr()
+    let l:origpath = b:mercurial_logged_file
+    " Delete any other buffer opened by this log.
+    " (buffers with Lawrencium paths that match this repo and filename)
+    for nr in range(1, winnr('$'))
+        let l:br = winbufnr(nr)
+        let l:bpath = bufname(l:br)
+        let l:bpath_comps = s:parse_lawrencium_path(l:bpath)
+        if l:bpath_comps['root'] != ''
+            let l:bpath_root = s:normalizepath(l:bpath_comps['root'])
+            let l:bpath_path = s:normalizepath(l:bpath_comps['path'])
+            if l:bpath_root == b:mercurial_dir && l:bpath_path == b:mercurial_logged_file
+                " Go to that window and switch to the previous buffer
+                " from the buffer with the file revision.
+                " Just switching away should delete the buffer since it
+                " has `bufhidden=delete`.
+                echom "Found buffer in window: ".nr
+                execute nr . 'wincmd w'
+                let l:altbufname = s:shellslash(bufname('#'))
+                if l:altbufname =~# '\v^lawrencium://'
+                    " This is a special Lawrencium buffer... it could be
+                    " a previously shown revision of the file opened with
+                    " this very `Hglog`, which we don't want to switch to.
+                    " Let's just default to editing the original file
+                    " again... not sure what else to do here.
+                    execute 'edit ' . l:origpath
+                else
+                    bprevious
+                endif
+            endif
+        endif
+    endfor
+    " Restore the current window if we switched away.
+    let l:curnr = winnr()
+    if l:curnr != l:orignr
+        execute l:orignr . 'wincmd w'
+    endif
+    
+    " Delete the temp file if it was created somehow.
+    call s:clean_tempfile(a:path)
 endfunction
 
 function! s:HgLog_FileRevEdit(...)
@@ -959,7 +1007,11 @@ function! s:HgLog_FileRevEdit(...)
         let l:rev = s:HgLog_GetSelectedRev()
     endif
     let l:path = 'lawrencium://' . b:mercurial_dir . '@' . b:mercurial_logged_file . '//' . l:rev
+    let l:path = fnameescape(l:path)
+    wincmd p
     execute 'edit ' . l:path
+    setlocal bufhidden=delete
+    setlocal buftype=nofile
 endfunction
 
 function! s:HgLog_GetSelectedRev() abort
@@ -989,12 +1041,16 @@ function! s:ReadFileRevision(path) abort
     else
         execute 'read !' . escape(l:repo.GetCommand('cat', '-r', l:comps['rev'], l:comps['path']), '%#\')
     endif
+    setlocal readonly
+    setlocal nomodifiable
+    setlocal nomodified
+    setlocal bufhidden=delete
     return ''
 endfunction
 
 augroup lawrencium_files
   autocmd!
-  autocmd BufReadCmd  lawrencium://**//[0-9a-f][0-9a-f]* exe s:ReadFileRevision(expand('<amatch>'))
+  autocmd BufReadCmd  lawrencium://**//[0-9a-f]* exe s:ReadFileRevision(expand('<amatch>'))
 augroup END
 
 " }}}

@@ -27,7 +27,8 @@
 1.  Introduction            |lawrencium-intro|
 2.  Commands                |lawrencium-commands|
 3.  Status Window           |lawrencium-status-window|
-4.  Global Settings         |lawrencium-global-settings|
+4.  Log Window              |lawrencium-log-window|
+5.  Global Settings         |lawrencium-global-settings|
 
 
 =============================================================================
@@ -63,10 +64,7 @@ All commands defined by |lawrencium| are local to each buffer.
 
                                                 *:Hg!*
 :Hg! {args}             Like |:Hg|, but the output of the command is placed in
-                        a temp file and edited in the |preview-window|, unless
-                        the |lawrencium_hg_bang_edit_command| global setting
-                        specifies that another type of window or buffer should
-                        be used.
+                        a temp file and edited in a split window.
 
                         Once the output is open in a buffer, Lawrencium will
                         try to set the file type according to the Mercurial
@@ -85,9 +83,9 @@ All commands defined by |lawrencium| are local to each buffer.
 :Hgedit! {file}         |:edit!| {file} relative to the root of the repository.
 
                                                 *:Hgstatus*
-:Hgstatus               Shows the output of 'hg status' in the
-                        |preview-window|. Some extra-commands, along with some
-                        default mappins, are available in this window. See
+:Hgstatus               Shows the output of 'hg status' in a split window.
+                        Some extra-commands, along with some default mappings,
+                        are available in this window. See
                         |lawrencium-status-window|.
 
                                                 *:Hgdiff*
@@ -121,6 +119,17 @@ All commands defined by |lawrencium| are local to each buffer.
                         given to prevent a .orig backup file from being
                         created.
 
+                                                *:Hglog*
+:Hglog
+                        Opens the history (log) for the currently edited file
+                        in a split window. Some extra-commands, along with 
+                        some default mappings, are available in this window.
+                        See |lawrencium-log-window|.
+
+                                                *:Hglog_f*
+:Hglog {file}           Same as |:Hglog|, but opens the log for the specified
+                        file instead of the currently edited file.
+
 
 =============================================================================
 3.  Status Window                               *lawrencium-status-window*
@@ -133,25 +142,25 @@ following descriptions.
 
                                                 *:Hgstatusedit*
 :Hgstatusedit           Open the file mentioned on the current line.
-                        Mapped to <cr>.
+                        Mapped to <CR>.
 
                                                 *:Hgstatusaddremove*
 :Hgstatusaddremove      Run `hg addremove` on the file mentioned on the
                         current line, or on the lines currently selected in
                         visual selection mode (see |visual-start|).
-                        Mapped to <C-A>.
+                        Mapped to <CTRL-A>.
 
                                                 *:Hgstatusdiff*
 :Hgstatusdiff           Open a diff window on the file mentioned on the
                         current line, between the working directory version
                         and the parent revision version. Similar to running
                         |:Hgdiff| on that file.
-                        Mapped to <C-D>.
+                        Mapped to <CTRL-D>.
 
                                                 *:Hgstatusvdiff*
 :Hgstatusvdiff          Similar to |:Hgstatusdiff|, but use a vertical split.
                         Similar to running |:Hgvdiff| on that file.
-                        Mapped to <C-V>.
+                        Mapped to <CTRL-V>.
 
                                                 *:Hgstatuscommit*
 :Hgstatuscommit         Runs |:Hgcommit| on the files currently mentioned in
@@ -159,7 +168,7 @@ following descriptions.
                         option means you can delete lines from the buffer
                         until the remaining filenames are those you want to
                         commit.
-                        Mapped to <C-S>.
+                        Mapped to <CTRL-S>.
 
                                                 *:Hgstatusvcommit*
 :Hgstatusvcommit        Similar to |:Hgstatuscommit|, but use a vertical
@@ -169,7 +178,7 @@ following descriptions.
                                                 *:Hgstatusrefresh*
 :Hgstatusrefresh        Refreshes the status window by running `hg status`
                         again.
-                        Mapped to <C-R>.
+                        Mapped to <CTRL-R>.
 
                                                 *:Hgstatusqnew*
 :Hgstatusqnew {patch} {message}.
@@ -194,7 +203,28 @@ A few other mappings are available in the status window:
 
 
 =============================================================================
-4.  Global Settings                             *lawrencium-global-settings*
+4.  Log Window                                  *lawrencium-log-window*
+                        
+The `hg log` window opened by Lawrencium has a few special commands 
+defined in it. Also, unless the global |lawrencium_define_mappings| is set to
+`0`, some commands are mapped to keyboard shortcuts, as detailed in the
+following descriptions.
+
+                                                *:Hglogrevedit*
+:Hglogrevedit           Looks at the revision specified on the current line,
+                        and opens that revision for edit in the previous
+                        window (although as a read-only buffer).
+                        Mapped to |<CR>|
+
+                                                *lawrencium-log-mappings*
+A few other mappings are available in the log window:
+
+    q                   Quit the log window.
+
+
+
+=============================================================================
+5.  Global Settings                             *lawrencium-global-settings*
 
 The following global settings can be defined in your |vimrc| to change the
 default behaviour of Lawrencium.
@@ -217,16 +247,6 @@ g:lawrencium_define_mappings
                         Specifies whether Lawrencium should define default
                         keyboard shortcuts.
                         Defaults to `1`.
-
-                                                *lawrencium_hg_bang_edit_command*
-g:lawrencium_hg_bang_edit_command
-                        Defines the Vim command to run when using the |:Hg!|
-                        command (with the bang) in order to show the output.
-                        
-                        Defaults to |pedit|, which opens the output of the
-                        command in the |preview-window|. A good alternative
-                        is to use |edit|, to open the output in a normal
-                        buffer.
 
                                                 *lawrencium_hg_commands_file_types*
 g:lawrencium_hg_commands_file_types
