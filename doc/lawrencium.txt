@@ -214,7 +214,25 @@ following descriptions.
 :Hglogrevedit           Looks at the revision specified on the current line,
                         and opens that revision for edit in the previous
                         window (although as a read-only buffer).
-                        Mapped to |<CR>|
+                        Mapped to |<CR>|.
+
+                                                *:Hglogdiff*
+:Hglogdiff              Looks at the revision specified on the current line,
+                        and runs an `hg diff` between that revision and the
+                        previously listed revision (in the line below). It
+                        opens that diff in the previous window.
+                        It doesn't do anything if the cursor is on the last
+                        line.
+                        Mapped to |<C-D>|.
+
+                                                *:Hglogdiff_r*
+:Hglogdiff {rev}        Same as |:Hglogdiff|, but opens a diff between the
+                        specified revision and the working directory.
+
+                                                *:Hglogdiff_r_r*
+:Hglogdiff {rev1} {rev2}
+                        Same as |:Hglogdiff|, but opens a diff between the
+                        two specified revisions.
 
                                                 *lawrencium-log-mappings*
 A few other mappings are available in the log window:
