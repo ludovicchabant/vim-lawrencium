@@ -674,10 +674,9 @@ call s:AddMainCommand("-bang -nargs=? -complete=customlist,s:ListRepoFiles Hgedi
 " Hgdiff {{{
 
 function! s:HgDiff(filename, vertical, ...) abort
-    " Default revisions to diff: the working directory (special Lawrencium 
-    " hard-coded syntax) and the parent of the working directory (using 
-    " Mercurial's revsets syntax).
-    let l:rev1 = 'lawrencium#_wdir_'
+    " Default revisions to diff: the working directory (null string) 
+    " and the parent of the working directory (using Mercurial's revsets syntax).
+    let l:rev1 = ''
     let l:rev2 = 'p1()'
     if a:0 == 1
         let l:rev2 = a:1
@@ -697,7 +696,7 @@ function! s:HgDiff(filename, vertical, ...) abort
     let l:diff_buffers = []
 
     " Get the first file and open it.
-    if l:rev1 == 'lawrencium#_wdir_'
+    if l:rev1 == ''
         if bufexists(l:path)
             execute 'buffer ' . fnameescape(l:path)
         else
@@ -724,7 +723,7 @@ function! s:HgDiff(filename, vertical, ...) abort
     if a:vertical
         let l:diffsplit = 'vertical diffsplit'
     endif
-    if l:rev2 == 'lawrencium#_wdir_'
+    if l:rev2 == ''
         execute l:diffsplit . ' ' . fnameescape(l:path)
     else
         let l:temp_file = tempname()
@@ -813,6 +812,41 @@ augroup end
 
 call s:AddMainCommand("-nargs=* -complete=customlist,s:ListRepoFiles Hgdiff :call s:HgDiff('%:p', 0, <f-args>)")
 call s:AddMainCommand("-nargs=* -complete=customlist,s:ListRepoFiles Hgvdiff :call s:HgDiff('%:p', 1, <f-args>)")
+
+" }}}
+
+" HgdiffSummary {{{
+
+function! s:HgDiffSummary(split, filename, ...) abort
+    " Default revisions to diff: the working directory (null string) 
+    " and the parent of the working directory (using Mercurial's revsets syntax).
+    let l:revs = ''
+    if a:0 == 1
+        let l:revs = a:1
+    elseif a:0 >= 2
+        let l:revs = a:1 . ',' . a:2
+    endif
+
+    " Get the current repo, and expand the given filename in case it contains
+    " fancy filename modifiers.
+    let l:repo = s:hg_repo()
+    let l:path = expand(a:filename)
+    call s:trace("Diff'ing revisions: '".l:revs."' on file: ".l:path)
+    let l:special = l:repo.GetLawrenciumPath(l:path, 'diff', l:revs)
+    if a:split == 1
+        split
+    elseif a:split == 2
+        vsplit
+    endif
+    execute 'edit ' . l:special
+    " Open all folds by default.
+    " TODO: maybe set `nofoldenable` instead?
+    %foldopen!
+endfunction
+
+call s:AddMainCommand("-nargs=* -complete=customlist,s:ListRepoFiles Hgdiffsum       :call s:HgDiffSummary(0, '%:p', <f-args>)")
+call s:AddMainCommand("-nargs=* -complete=customlist,s:ListRepoFiles Hgdiffsumsplit  :call s:HgDiffSummary(1, '%:p', <f-args>)")
+call s:AddMainCommand("-nargs=* -complete=customlist,s:ListRepoFiles Hgvdiffsumsplit :call s:HgDiffSummary(2, '%:p', <f-args>)")
 
 " }}}
 
@@ -1115,8 +1149,10 @@ function! s:ReadLawrenciumFile(path) abort
             else
                 call l:repo.ReadCommandOutput('diff', '-r', l:rev1, '-r', l:rev2, l:comps['path'])
             endif
-        else
+        elseif l:comps['value'] != ''
             call l:repo.ReadCommandOutput('diff', '-c', l:comps['value'], l:comps['path'])
+        else
+            call l:repo.ReadCommandOutput('diff', l:comps['path'])
         endif
         setlocal filetype=diff
     endif

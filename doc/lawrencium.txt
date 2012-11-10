@@ -90,15 +90,47 @@ All commands defined by |lawrencium| are local to each buffer.
 
                                                 *:Hgdiff*
 :Hgdiff                 Diffs the current file against its parent revision.
+                        This splits the current window to show both the
+                        current file and the parent revision file, using Vim's
+                        |diff| abilities.
 
                                                 *:Hgdiff_f*
-:Hgdiff {revspec}       Diffs the current file against the specified revision.
+:Hgdiff {revspec}       Same as |:Hgdiff| but shows a diff of the current file
+                        with the specified revision. Any revision number, hash
+                        or spec that can be passed to `hg cat` is valid.
 
                                                 *:Hgvdiff*
-:Hgvdiff                Same as |:Hgdiff| but uses a vertical split.
+:Hgvdiff                Same as |:Hgdiff| but uses a vertical split instead of
+                        a horizontal split.
 
                                                 *:Hgvdiff_f*
 :Hgvdiff {revspec}      Same as |:Hgdiff_f| but uses a vertical split.
+
+                                                *:Hgdiffsum*
+:Hgdiffsum              Shows the "diff summary" (the output of `hg diff`)
+                        of the current file against its parent revision.
+
+                                                *:Hgdiffsum_f*
+:Hgdiffsum {revspec}    Same as |:Hgdiffsum| but shows a "diff summary" of the
+                        current file with the specified revision. Any revision
+                        number, hash or spec that can be passed to `hg diff`
+                        is valid.
+
+                                                *:Hgdiffsumsplit*
+                                                *:Hgdiffsumsplit_f*
+:Hgdiffsumsplit
+:Hgdiffsumsplit {revspec}
+                        Same as |:Hgdiffsum| and |:Hgdiffsum_f| respectively, 
+                        but opens the diff summary in a split window instead
+                        of the current window.
+
+                                                *:Hgvdiffsumsplit*
+                                                *:Hgvdiffsumsplit_f*
+:Hgvdiffsumsplit
+:Hgvdiffsumsplit {revspec}
+                        Same as |:Hgdiffsumsplit| and |:Hgdiffsumsplit_f|
+                        respectively, but uses a vertical split window instead
+                        of a horizontal split window.
 
                                                 *:Hgcommit*
 :Hgcommit               Opens a new window to edit a commit message into a
