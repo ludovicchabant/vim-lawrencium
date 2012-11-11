@@ -705,17 +705,10 @@ function! s:HgDiff(filename, vertical, ...) abort
         " Make it part of the diff group.
         call s:HgDiff_DiffThis()
     else
-        let l:temp_file = tempname()
-        call l:repo.RunCommand('cat', '-r', '"'.l:rev1.'"', '-o', '"'.l:temp_file.'"', '"'.l:path.'"')
-        execute 'edit ' . fnameescape(l:temp_file)
+        let l:rev_path = l:repo.GetLawrenciumPath(l:path, 'rev', l:rev1)
+        execute 'edit ' . fnameescape(l:rev_path)
         " Make it part of the diff group.
         call s:HgDiff_DiffThis()
-        " Remember the repo it belongs to.
-        let b:mercurial_dir = l:repo.root_dir
-        " Make sure it's deleted when we move away from it.
-        setlocal bufhidden=delete
-        " Make commands available.
-        call s:DefineMainCommands()
     endif
 
     " Get the second file and open it too.
@@ -726,15 +719,8 @@ function! s:HgDiff(filename, vertical, ...) abort
     if l:rev2 == ''
         execute l:diffsplit . ' ' . fnameescape(l:path)
     else
-        let l:temp_file = tempname()
-        call l:repo.RunCommand('cat', '-r', '"'.l:rev2.'"', '-o', '"'.l:temp_file.'"', '"'.l:path.'"')
-        execute l:diffsplit . ' ' . fnameescape(l:temp_file)
-        " Remember the repo it belongs to.
-        let b:mercurial_dir = l:repo.root_dir
-        " Make sure it's deleted when we move away from it.
-        setlocal bufhidden=delete
-        " Make commands available.
-        call s:DefineMainCommands()
+        let l:rev_path = l:repo.GetLawrenciumPath(l:path, 'rev', l:rev1)
+        execute l:diffsplit . ' ' . fnameescape(l:rev_path)
     endif
 endfunction
 
@@ -1157,10 +1143,17 @@ function! s:ReadLawrenciumFile(path) abort
         setlocal filetype=diff
     endif
 
+    " Setup the new buffer.
     setlocal readonly
     setlocal nomodified
     setlocal bufhidden=delete
     setlocal buftype=nofile
+
+    " Remember the repo it belongs to and make
+    " the Lawrencium commands available.
+    let b:mercurial_dir = l:repo.root_dir
+    call s:DefineMainCommands()
+
     return ''
 endfunction
 
