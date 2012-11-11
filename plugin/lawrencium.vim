@@ -480,7 +480,7 @@ function! s:HgStatus() abort
     " to it.
     let b:mercurial_dir = l:repo.root_dir
     setlocal buftype=nofile
-    setlocal syntax=hgstatus
+    setlocal filetype=hgstatus
 
     " Make commands available.
     call s:DefineMainCommands()
@@ -866,7 +866,7 @@ function! s:HgCommit(bang, vertical, ...) abort
     let b:mercurial_dir = l:repo.root_dir
     let b:lawrencium_commit_files = l:filenames
     setlocal bufhidden=delete
-    setlocal syntax=hgcommit
+    setlocal filetype=hgcommit
     if a:bang
         autocmd BufDelete <buffer> call s:HgCommit_Execute(expand('<afile>:p'), 0)
     else
@@ -973,6 +973,8 @@ call s:AddMainCommand("-bang -nargs=* -complete=customlist,s:ListRepoFiles Hgrev
 
 " Hglog {{{
 
+let s:log_style_file = expand("<sfile>:h:h") . "/resources/hg_log.style"
+
 function! s:HgLog(...) abort
     let l:filepath = expand('%:p')
     if a:0 == 1
@@ -981,7 +983,7 @@ function! s:HgLog(...) abort
 
     " Get the repo and run the command.
     let l:repo = s:hg_repo()
-    let l:output = l:repo.RunCommand('log', l:filepath, '--template', '"{rev}\t{desc|firstline}\n"')
+    let l:output = l:repo.RunCommand('log', '--style', shellescape(s:log_style_file), l:filepath)
 
     " Open a new temp buffer in the preview window, jump to it,
     " and paste the `hg log` output in there.
@@ -997,7 +999,7 @@ function! s:HgLog(...) abort
     let b:mercurial_logged_file = l:filepath
     setlocal bufhidden=delete
     setlocal buftype=nofile
-    setlocal syntax=hglog
+    setlocal filetype=hglog
 
     " Make commands available.
     call s:DefineMainCommands()
@@ -1094,7 +1096,7 @@ function! s:HgLog_GetSelectedRev(...) abort
         let l:line = getline('.')
     endif
     " Behold, Vim's look-ahead regex syntax again! WTF.
-    let l:rev = matchstr(l:line, '\v^(\d+)(\s)@=')
+    let l:rev = matchstr(l:line, '\v^(\d+)(\:)@=')
     if l:rev == ''
         call s:throw("Can't parse revision number from line: " . l:line)
     endif
