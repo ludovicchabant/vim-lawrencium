@@ -115,7 +115,7 @@ endfunction
 
 " Given a Lawrencium path (e.g: 'lawrencium:///repo/root_dir//foo/bar/file.py//rev=34'), extract
 " the repository root, relative file path and revision number/changeset ID.
-function! s:parse_lawrencium_path(lawrencium_path)
+function! s:parse_lawrencium_path(lawrencium_path, ...)
     let l:repo_path = s:shellslash(a:lawrencium_path)
     if l:repo_path =~? '\v^lawrencium://'
         let l:repo_path = strpart(l:repo_path, strlen('lawrencium://'))
@@ -142,12 +142,17 @@ function! s:parse_lawrencium_path(lawrencium_path)
         endif
     endif
 
-    execute 'cd! ' . l:root_dir
-    let l:absolute_repo_path = fnamemodify(l:repo_path, ':p')
-    let l:relative_repo_path = fnamemodify(l:repo_path, ':.')
-    execute 'cd! -'
+    if a:0 > 0
+        execute 'cd! ' . l:root_dir
+        if a:1 == 'relative'
+            let l:repo_path = fnamemodify(l:repo_path, ':.')
+        elseif a:1 == 'absolute'
+            let l:repo_path = fnamemodify(l:repo_path, ':p')
+        endif
+        execute 'cd! -'
+    endif
     
-    let l:result = { 'root': l:root_dir, 'path': l:absolute_repo_path, 'relpath': l:relative_repo_path, 'action': l:action, 'value': l:value }
+    let l:result = { 'root': l:root_dir, 'path': l:repo_path, 'action': l:action, 'value': l:value }
     return l:result
 endfunction
 
@@ -176,6 +181,13 @@ function! s:HgRepo.GetFullPath(path) abort
         let l:root_dir = s:stripslash(l:root_dir)
     endif
     return l:root_dir . a:path
+endfunction
+
+function! s:HgRepo.GetRelativePath(path) abort
+    execute 'cd! ' . self.root_dir
+    let l:relative_path = fnamemodify(a:path, ':.')
+    execute 'cd! -'
+    return l:relative_path
 endfunction
 
 " Gets a list of files matching a root-relative pattern.
@@ -230,12 +242,14 @@ function! s:HgRepo.ReadCommandOutput(command, ...) abort
 endfunction
 
 " Build a Lawrencium path for the given file and action.
-function! s:HgRepo.GetLawrenciumPath(path, action, value) abort
-    execute 'cd! ' . self.root_dir
-    let l:relative_path = fnamemodify(a:path, ':.')
-    execute 'cd! -'
-
-    let l:result = 'lawrencium://' . s:stripslash(self.root_dir) . '//' . l:relative_path
+" By default, the given path will be made relative to the repository root,
+" unless '0' is passed as the 4th argument.
+function! s:HgRepo.GetLawrenciumPath(path, action, value, ...) abort
+    let l:path = a:path
+    if a:0 == 0 || !a:1
+        let l:path = self.GetRelativePath(a:path)
+    endif
+    let l:result = 'lawrencium://' . s:stripslash(self.root_dir) . '//' . l:path
     if a:action !=? ''
         let l:result  = l:result . '//' . a:action
         if a:value !=? ''
@@ -671,11 +685,12 @@ call s:AddMainCommand("-bang -nargs=? -complete=customlist,s:ListRepoFiles Hgedi
 
 " }}}
 
-" Hgdiff {{{
+" Hgdiff, Hgvdiff {{{
 
 function! s:HgDiff(filename, vertical, ...) abort
     " Default revisions to diff: the working directory (null string) 
     " and the parent of the working directory (using Mercurial's revsets syntax).
+    " Otherwise, use the 1 or 2 revisions specified as extra parameters.
     let l:rev1 = ''
     let l:rev2 = 'p1()'
     if a:0 == 1
@@ -796,16 +811,17 @@ augroup lawrencium_diff
   autocmd BufWinLeave * call s:HgDiff_CleanUp()
 augroup end
 
-call s:AddMainCommand("-nargs=* -complete=customlist,s:ListRepoFiles Hgdiff :call s:HgDiff('%:p', 0, <f-args>)")
-call s:AddMainCommand("-nargs=* -complete=customlist,s:ListRepoFiles Hgvdiff :call s:HgDiff('%:p', 1, <f-args>)")
+call s:AddMainCommand("-nargs=* Hgdiff :call s:HgDiff('%:p', 0, <f-args>)")
+call s:AddMainCommand("-nargs=* Hgvdiff :call s:HgDiff('%:p', 1, <f-args>)")
 
 " }}}
 
-" HgdiffSummary {{{
+" Hgdiffsum, Hgdiffsumsplit, Hgvdiffsumsplit {{{
 
-function! s:HgDiffSummary(split, filename, ...) abort
+function! s:HgDiffSummary(filename, split, ...) abort
     " Default revisions to diff: the working directory (null string) 
     " and the parent of the working directory (using Mercurial's revsets syntax).
+    " Otherwise, use the 1 or 2 revisions specified as extra parameters.
     let l:revs = ''
     if a:0 == 1
         let l:revs = a:1
@@ -830,9 +846,9 @@ function! s:HgDiffSummary(split, filename, ...) abort
     %foldopen!
 endfunction
 
-call s:AddMainCommand("-nargs=* -complete=customlist,s:ListRepoFiles Hgdiffsum       :call s:HgDiffSummary(0, '%:p', <f-args>)")
-call s:AddMainCommand("-nargs=* -complete=customlist,s:ListRepoFiles Hgdiffsumsplit  :call s:HgDiffSummary(1, '%:p', <f-args>)")
-call s:AddMainCommand("-nargs=* -complete=customlist,s:ListRepoFiles Hgvdiffsumsplit :call s:HgDiffSummary(2, '%:p', <f-args>)")
+call s:AddMainCommand("-nargs=* Hgdiffsum       :call s:HgDiffSummary('%:p', 0, <f-args>)")
+call s:AddMainCommand("-nargs=* Hgdiffsumsplit  :call s:HgDiffSummary('%:p', 1, <f-args>)")
+call s:AddMainCommand("-nargs=* Hgvdiffsumsplit :call s:HgDiffSummary('%:p', 2, <f-args>)")
 
 " }}}
 
@@ -971,19 +987,34 @@ call s:AddMainCommand("-bang -nargs=* -complete=customlist,s:ListRepoFiles Hgrev
 
 " }}}
 
-" Hglog {{{
+" Hglog, Hgrepolog {{{
 
 let s:log_style_file = expand("<sfile>:h:h") . "/resources/hg_log.style"
 
-function! s:HgLog(...) abort
-    let l:filepath = expand('%:p')
-    if a:0 == 1
-        let l:filepath = a:1
+function! s:HgLog(is_file, ...) abort
+    " Get the file or directory to get the log from, or figure out
+    " some nice defaults (the current file, or the whole repository).
+    if a:is_file
+        let l:log_path = expand('%:p')
+    else
+        let l:log_path = '.'
     endif
 
-    " Get the repo and run the command.
+    " If the file or directory is specified, get the absolute path.
     let l:repo = s:hg_repo()
-    let l:output = l:repo.RunCommand('log', '--style', shellescape(s:log_style_file), l:filepath)
+    if a:0 == 1
+        let l:log_path = l:repo.GetFullPath(a:1)
+    endif
+
+    " Run the command.
+    if l:log_path == '.'
+        let l:output = l:repo.RunCommand('log', '--style', shellescape(s:log_style_file))
+    else
+        let l:output = l:repo.RunCommand('log', '--style', shellescape(s:log_style_file), l:log_path)
+    endif
+
+    " Remember the file that opened this log.
+    let l:original_path = expand('%:p')
 
     " Open a new temp buffer in the preview window, jump to it,
     " and paste the `hg log` output in there.
@@ -996,7 +1027,8 @@ function! s:HgLog(...) abort
     " Setup the buffer correctly: readonly, and with the correct repo linked
     " to it, and deleted on close.
     let b:mercurial_dir = l:repo.root_dir
-    let b:mercurial_logged_file = l:filepath
+    let b:lawrencium_logged_path = l:repo.GetRelativePath(l:log_path)
+    let b:lawrencium_original_path = l:original_path
     setlocal bufhidden=delete
     setlocal buftype=nofile
     setlocal filetype=hglog
@@ -1005,23 +1037,30 @@ function! s:HgLog(...) abort
     call s:DefineMainCommands()
 
     " Add some other nice commands and mappings.
-    command! -buffer -nargs=? Hglogrevedit :call s:HgLog_FileRevEdit(<f-args>)
     command! -buffer -nargs=* Hglogdiff    :call s:HgLog_Diff(<f-args>)
+    if a:is_file
+        command! -buffer -nargs=? Hglogrevedit :call s:HgLog_FileRevEdit(<f-args>)
+    endif
 
     if g:lawrencium_define_mappings
-        nnoremap <buffer> <silent> <cr>  :Hglogrevedit<cr>
-        nnoremap <buffer> <silent> <C-D> :Hglogdiff<cr>
+        nnoremap <buffer> <silent> <cr> :Hglogdiff<cr>
         nnoremap <buffer> <silent> q     :bdelete!<cr>
+        if a:is_file
+            nnoremap <buffer> <silent> <C-E>  :Hglogrevedit<cr>
+        endif
     endif
 
     " Clean up when the log buffer is deleted.
-    autocmd BufDelete <buffer> call s:HgLog_Delete(expand('<afile>:p'))
+    execute 'autocmd BufDelete <buffer> call s:HgLog_Delete(' . a:is_file . ', "' . fnameescape(l:temp_file) . '")'
 endfunction
 
-function! s:HgLog_Delete(path)
+function! s:HgLog_Delete(was_file, path)
+    let l:repo = s:hg_repo()
     let l:orignr = winnr()
-    let l:origpath = b:mercurial_logged_file
+    let l:origedit = b:lawrencium_original_path
     let l:origroot = s:stripslash(b:mercurial_dir)
+    let l:origpath = s:stripslash(b:lawrencium_logged_path)
+    call s:trace("Cleaning up '" . a:path . "', opened from '" . l:origedit . "'")
     " Delete any other buffer opened by this log.
     " (buffers with Lawrencium paths that match this repo and filename)
     for nr in range(1, winnr('$'))
@@ -1030,7 +1069,8 @@ function! s:HgLog_Delete(path)
         let l:bpath_comps = s:parse_lawrencium_path(l:bpath)
         if l:bpath_comps['root'] != ''
             let l:bpath_root = s:normalizepath(l:bpath_comps['root'])
-            let l:bpath_path = s:normalizepath(l:bpath_comps['path'])
+            let l:bpath_path = s:normalizepath(s:stripslash(l:bpath_comps['path']))
+            call s:trace("Comparing '".l:bpath_path."' and '".l:origpath."' for cleanup.")
             if l:bpath_root == l:origroot && l:bpath_path == l:origpath
                 " Go to that window and switch to the previous buffer
                 " from the buffer with the file revision.
@@ -1043,8 +1083,9 @@ function! s:HgLog_Delete(path)
                     " a previously shown revision of the file opened with
                     " this very `Hglog`, which we don't want to switch to.
                     " Let's just default to editing the original file
-                    " again... not sure what else to do here.
-                    execute 'edit ' . l:origpath
+                    " again... not sure what else to do here...
+                    call s:trace("Reverting to editing: " . l:origedit)
+                    execute 'edit ' . l:origedit
                 else
                     bprevious
                 endif
@@ -1070,7 +1111,7 @@ function! s:HgLog_FileRevEdit(...)
         let l:rev = s:HgLog_GetSelectedRev()
     endif
     let l:repo = s:hg_repo()
-    let l:path = l:repo.GetLawrenciumPath(b:mercurial_logged_file, 'rev', l:rev)
+    let l:path = l:repo.GetLawrenciumPath(b:lawrencium_logged_path, 'rev', l:rev)
     wincmd p
     execute 'edit ' . fnameescape(l:path)
 endfunction
@@ -1084,7 +1125,7 @@ function! s:HgLog_Diff(...) abort
         let l:revs = s:HgLog_GetSelectedRev()
     endif
     let l:repo = s:hg_repo()
-    let l:path = l:repo.GetLawrenciumPath(b:mercurial_logged_file, 'diff', l:revs)
+    let l:path = l:repo.GetLawrenciumPath(b:lawrencium_logged_path, 'diff', l:revs)
     wincmd p
     execute 'edit ' . fnameescape(l:path)
 endfunction
@@ -1103,7 +1144,8 @@ function! s:HgLog_GetSelectedRev(...) abort
     return l:rev
 endfunction
 
-call s:AddMainCommand("-nargs=? -complete=customlist,s:ListRepoFiles Hglog :call s:HgLog(<f-args>)")
+call s:AddMainCommand("-nargs=? -complete=customlist,s:ListRepoDirs  Hgrepolog  :call s:HgLog(0, <f-args>)")
+call s:AddMainCommand("-nargs=? -complete=customlist,s:ListRepoFiles Hglog      :call s:HgLog(1, <f-args>)")
 
 " }}}
 
@@ -1117,31 +1159,37 @@ function! s:ReadLawrenciumFile(path) abort
     endif
 
     let l:repo = s:hg_repo(l:comps['root'])
+    let l:full_path = l:repo.root_dir . l:comps['path']
     if l:comps['action'] == 'rev'
         " Read revision (`hg cat`)
         if l:comps['value'] == ''
-            call l:repo.ReadCommandOutput('cat', l:comps['path'])
+            call l:repo.ReadCommandOutput('cat', l:full_path)
         else
-            call l:repo.ReadCommandOutput('cat', '-r', l:comps['value'], l:comps['path'])
+            call l:repo.ReadCommandOutput('cat', '-r', l:comps['value'], l:full_path)
         endif
     elseif l:comps['action'] == 'diff'
         " Diff revisions (`hg diff`)
+        let l:diffargs = []
         let l:commaidx = stridx(l:comps['value'], ',')
         if l:commaidx > 0
             let l:rev1 = strpart(l:comps['value'], 0, l:commaidx)
             let l:rev2 = strpart(l:comps['value'], l:commaidx + 1)
             if l:rev1 == '-'
-                call l:repo.ReadCommandOutput('diff', '-r', l:rev2, l:comps['path'])
+                let l:diffargs = [ '-r', l:rev2 ]
             elseif l:rev2 == '-'
-                call l:repo.ReadCommandOutput('diff', '-r', l:rev1, l:comps['path'])
+                let l:diffargs = [ '-r', l:rev1 ]
             else
-                call l:repo.ReadCommandOutput('diff', '-r', l:rev1, '-r', l:rev2, l:comps['path'])
+                let l:diffargs = [ '-r', l:rev1, '-r', l:rev2 ]
             endif
         elseif l:comps['value'] != ''
-            call l:repo.ReadCommandOutput('diff', '-c', l:comps['value'], l:comps['path'])
+            let l:diffargs = [ '-c', l:comps['value'] ]
         else
-            call l:repo.ReadCommandOutput('diff', l:comps['path'])
+            let l:diffargs = []
         endif
+        if l:comps['path'] != '' && l:comps['path'] != '.'
+            call add(l:diffargs, l:full_path)
+        endif
+        call l:repo.ReadCommandOutput('diff', l:diffargs)
         setlocal filetype=diff
     endif
 
