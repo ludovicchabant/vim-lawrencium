@@ -162,6 +162,12 @@ All commands defined by |lawrencium| are local to each buffer.
 :Hglog {file}           Same as |:Hglog|, but opens the log for the specified
                         file instead of the currently edited file.
 
+                                                *:Hgrepolog*
+:Hgrepolog              Opens the history (log) for the whole repository in a
+                        split window. Some extra-commands, along with some
+                        default mappings, are available in this window.
+                        See |lawrencium-log-window|.
+
 
 =============================================================================
 3.  Status Window                               *lawrencium-status-window*
