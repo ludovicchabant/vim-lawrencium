@@ -28,7 +28,8 @@
 2.  Commands                |lawrencium-commands|
 3.  Status Window           |lawrencium-status-window|
 4.  Log Window              |lawrencium-log-window|
-5.  Global Settings         |lawrencium-global-settings|
+5.  Annotate Window         |lawrencium-annotate-window|
+6.  Global Settings         |lawrencium-global-settings|
 
 
 =============================================================================
@@ -168,6 +169,17 @@ All commands defined by |lawrencium| are local to each buffer.
                         default mappings, are available in this window.
                         See |lawrencium-log-window|.
 
+                                                *:Hgannotate*
+:Hgannotate             Splits the current window to show annotations in the
+                        left window. These annotation are retrieved with `hg
+                        annotate`.
+                        If the current file has local edits, the full output
+                        of `hg annotate` will be opened instead, which is the
+                        annotated parent revision.
+                        Some extra-commands, along with some default mappings,
+                        are available in this window.
+                        See |lawrencium-annotate-window|.
+
 
 =============================================================================
 3.  Status Window                               *lawrencium-status-window*
@@ -199,6 +211,17 @@ following descriptions.
 :Hgstatusvdiff          Similar to |:Hgstatusdiff|, but use a vertical split.
                         Similar to running |:Hgvdiff| on that file.
                         Mapped to <CTRL-V>.
+
+                                                *:Hgstatusdiffsum*
+:Hgstatusdiffsum        Similar to |:Hgstatusdiff|, but show a diff summary,
+                        like the one shown with |:Hgdiffsum|, instead of
+                        running a full Vim diff.
+                        Mapped to <CTRL-U>.
+
+                                                *:Hgstatusvdiffsum*
+:Hgstatusvdiffsum       Similar to |:Hgstatusdiffsum|, but use a vertical
+                        split.
+                        Mapped to <CTRL-H>.
 
                                                 *:Hgstatuscommit*
 :Hgstatuscommit         Runs |:Hgcommit| on the files currently mentioned in
@@ -280,7 +303,21 @@ A few other mappings are available in the log window:
 
 
 =============================================================================
-5.  Global Settings                             *lawrencium-global-settings*
+5.  Annotate Window                             *lawrencium-annotate-window*
+
+The following commands are available in a |:Hgannotate| window along with the
+specified keyboard mappings, unless the |lawrencium_define_mappings| setting
+is set to `0`.
+
+                                                *Hgannotatediffsum*
+:Hgannotatediffsum      Show a diff summary (similar to |:Hgdiffsum|) for the
+                        revision mentioned under the cursor.
+                        Mapped to |<CR>|.
+
+
+
+=============================================================================
+6.  Global Settings                             *lawrencium-global-settings*
 
 The following global settings can be defined in your |vimrc| to change the
 default behaviour of Lawrencium.
@@ -316,5 +353,13 @@ g:lawrencium_hg_commands_file_types
                         diff                diff
                         graphlog            graphlog
 
+                                                *lawrencium_annotate_width_offset*
+g:lawrencium_annotate_width_offset
+                        Specifies the offset to use when computing the width
+                        of the annotations window (opened with |:Hgannotate|).
+                        Defaults to 0.
+                        This is useful for example if you have |'listchars'|
+                        set to display characters at the window border when
+                        unwrapped lines are extending outside.
 
  vim:tw=78:et:ft=help:norl:
