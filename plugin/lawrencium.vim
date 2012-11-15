@@ -503,6 +503,8 @@ function! s:HgStatus() abort
     command! -buffer          Hgstatusedit      :call s:HgStatus_FileEdit()
     command! -buffer          Hgstatusdiff      :call s:HgStatus_Diff(0)
     command! -buffer          Hgstatusvdiff     :call s:HgStatus_Diff(1)
+    command! -buffer          Hgstatusdiffsum   :call s:HgStatus_DiffSummary(0)
+    command! -buffer          Hgstatusvdiffsum   :call s:HgStatus_DiffSummary(1)
     command! -buffer          Hgstatusrefresh   :call s:HgStatus_Refresh()
     command! -buffer -range   Hgstatusaddremove :call s:HgStatus_AddRemove(<line1>, <line2>)
     command! -buffer -range=% -bang Hgstatuscommit  :call s:HgStatus_Commit(<line1>, <line2>, <bang>0, 0)
@@ -517,6 +519,8 @@ function! s:HgStatus() abort
         nnoremap <buffer> <silent> <C-P> :call search('^[MARC\!\?I ]\s.', 'Wbe')<cr>
         nnoremap <buffer> <silent> <C-D> :Hgstatusdiff<cr>
         nnoremap <buffer> <silent> <C-V> :Hgstatusvdiff<cr>
+        nnoremap <buffer> <silent> <C-U> :Hgstatusdiffsum<cr>
+        nnoremap <buffer> <silent> <C-H> :Hgstatusvdiffsum<cr>
         nnoremap <buffer> <silent> <C-A> :Hgstatusaddremove<cr>
         nnoremap <buffer> <silent> <C-S> :Hgstatuscommit<cr>
         nnoremap <buffer> <silent> <C-R> :Hgstatusrefresh<cr>
@@ -590,6 +594,17 @@ function! s:HgStatus_Diff(vertical) abort
     " Open the file and run `Hgdiff` on it.
     call s:HgStatus_FileEdit()
     call s:HgDiff('%:p', a:vertical)
+endfunction
+
+function! s:HgStatus_DiffSummary(vertical) abort
+    " Get the path of the file the cursor is on.
+    let l:path = s:HgStatus_GetSelectedFile()
+    let l:split_type = 1
+    if a:vertical
+        let l:split_type = 2
+    endif
+    wincmd p
+    call s:HgDiffSummary(l:path, l:split_type)
 endfunction
 
 function! s:HgStatus_QNew(linestart, lineend, patchname, ...) abort
