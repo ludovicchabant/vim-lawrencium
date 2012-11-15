@@ -32,6 +32,10 @@ if !exists('g:lawrencium_define_mappings')
     let g:lawrencium_define_mappings = 1
 endif
 
+if !exists('g:lawrencium_annotate_width_offset')
+    let g:lawrencium_annotate_width_offset = 0
+endif
+
 " }}}
 
 " Utility {{{
@@ -1164,6 +1168,97 @@ call s:AddMainCommand("-nargs=? -complete=customlist,s:ListRepoFiles Hglog      
 
 " }}}
 
+" Hgannotate {{{
+
+function! s:HgAnnotate() abort
+    " Get the Lawrencium path for the annotated file.
+    let l:path = expand('%:p')
+    let l:bufnr = bufnr('%')
+    let l:repo = s:hg_repo()
+    let l:annotation_path = l:repo.GetLawrenciumPath(l:path, 'annotate', '')
+    
+    " Check if we're trying to annotate something with local changes.
+    let l:has_local_edits = 0
+    let l:path_status = l:repo.RunCommand('status', l:path)
+    if l:path_status != ''
+        call s:trace("Found local edits for '" . l:path . "'. Will annotate parent revision.")
+        let l:has_local_edits = 1
+    endif
+    
+    if l:has_local_edits
+        " Just open the output of the command.
+        echom "Local edits found, will show the annotations for the parent revision."
+        execute 'edit ' . l:annotation_path
+        setlocal nowrap nofoldenable
+        setlocal filetype=hgannotate
+    else
+        " Store some info about the current buffer.
+        let l:cur_bufnr = bufnr('%')
+        let l:cur_topline = line('w0') + &scrolloff
+        let l:cur_line = line('.')
+        let l:cur_wrap = &wrap
+        let l:cur_foldenable = &foldenable
+
+        " Open the annotated file in a split buffer on the left, after
+        " having disabled wrapping and folds on the current file.
+        " Make both windows scroll-bound.
+        setlocal scrollbind nowrap nofoldenable
+        execute 'keepalt leftabove vsplit ' . l:annotation_path
+        setlocal nonumber
+        setlocal scrollbind nowrap nofoldenable foldcolumn=0
+        setlocal filetype=hgannotate
+
+        " When the annotated window is closed, restore the settings we
+        " changed on the current buffer.
+        execute 'autocmd BufDelete <buffer> call s:HgAnnotate_Delete(' . l:cur_bufnr . ', ' . l:cur_wrap . ', ' . l:cur_foldenable . ')'
+
+        execute l:cur_topline
+        normal! zt
+        execute l:cur_line
+        syncbind
+
+        " Set the correct window width for the annotations.
+        let l:column_count = strlen(matchstr(getline('.'), '[^:]*:')) + g:lawrencium_annotate_width_offset - 1
+        execute "vertical resize " . l:column_count
+        set winfixwidth
+    endif
+
+    " Make the annotate buffer a Lawrencium buffer.
+    let b:mercurial_dir = l:repo.root_dir
+    let b:lawrencium_annotated_path = l:path
+    let b:lawrencium_annotated_bufnr = l:bufnr
+    call s:DefineMainCommands()
+
+    " Add some other nice commands and mappings.
+    command! -buffer Hgannotatediffsum :call s:HgAnnotate_DiffSummary()
+    if g:lawrencium_define_mappings
+        nnoremap <buffer> <silent> <cr> :Hgannotatediffsum<cr>
+    endif
+endfunction
+
+function! s:HgAnnotate_Delete(orig_bufnr, orig_wrap, orig_foldenable) abort
+    execute 'call setwinvar(bufwinnr(' . a:orig_bufnr . '), "&scrollbind", 0)'
+    if a:orig_wrap
+        execute 'call setwinvar(bufwinnr(' . a:orig_bufnr . '), "&wrap", 1)'
+    endif
+    if a:orig_foldenable
+        execute 'call setwinvar(bufwinnr(' . a:orig_bufnr . '), "&foldenable", 1)'
+    endif
+endfunction
+
+function! s:HgAnnotate_DiffSummary() abort
+    let l:line = getline('.')
+    let l:rev_hash = matchstr(l:line, '\v[a-f0-9]{12}')
+    let l:repo = s:hg_repo()
+    let l:path = l:repo.GetLawrenciumPath(b:lawrencium_annotated_path, 'diff', l:rev_hash)
+    execute b:lawrencium_annotated_bufnr . 'wincmd w'
+    execute 'keepalt rightbelow split ' . fnameescape(l:path)
+endfunction
+
+call s:AddMainCommand("Hgannotate :call s:HgAnnotate()")
+
+" }}}
+
 " Lawrencium files {{{
 
 function! s:ReadLawrenciumFile(path) abort
@@ -1206,6 +1301,9 @@ function! s:ReadLawrenciumFile(path) abort
         endif
         call l:repo.ReadCommandOutput('diff', l:diffargs)
         setlocal filetype=diff
+    elseif l:comps['action'] == 'annotate'
+        " Annotate file
+        call l:repo.ReadCommandOutput('annotate', '-c', '-n', '-u', '-d', '-q', l:full_path)
     endif
 
     " Setup the new buffer.
