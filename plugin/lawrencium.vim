@@ -238,7 +238,7 @@ function! s:HgRepo.ReadCommandOutput(command, ...) abort
     let l:all_args = [a:command] + a:000
     let l:hg_command = call(self['GetCommand'], l:all_args, self)
     call s:trace("Running Mercurial command: " . l:hg_command)
-    execute 'read !' . escape(l:hg_command, '%#\')
+    execute '0read !' . escape(l:hg_command, '%#\')
 endfunction
 
 " Build a Lawrencium path for the given file and action.
@@ -1198,6 +1198,7 @@ function! s:ReadLawrenciumFile(path) abort
     setlocal nomodified
     setlocal bufhidden=delete
     setlocal buftype=nofile
+    goto
 
     " Remember the repo it belongs to and make
     " the Lawrencium commands available.
