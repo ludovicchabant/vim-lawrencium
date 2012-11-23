@@ -32,6 +32,10 @@ if !exists('g:lawrencium_define_mappings')
     let g:lawrencium_define_mappings = 1
 endif
 
+if !exists('g:lawrencium_auto_close_buffers')
+    let g:lawrencium_auto_close_buffers = 1
+endif
+
 if !exists('g:lawrencium_annotate_width_offset')
     let g:lawrencium_annotate_width_offset = 0
 endif
@@ -158,6 +162,73 @@ function! s:parse_lawrencium_path(lawrencium_path, ...)
     
     let l:result = { 'root': l:root_dir, 'path': l:repo_path, 'action': l:action, 'value': l:value }
     return l:result
+endfunction
+
+" Finds a window whose displayed buffer has a given variable
+" set to the given value.
+function! s:find_buffer_window(varname, varvalue) abort
+    for wnr in range(1, winnr('$'))
+        let l:bnr = winbufnr(wnr)
+        if getbufvar(l:bnr, a:varname) == a:varvalue
+            return l:wnr
+        endif
+    endfor
+    return -1
+endfunction
+
+" Opens a buffer in a way that makes it easy to delete it later:
+" - if the about-to-be previous buffer doesn't have a given variable,
+"   just open the new buffer.
+" - if the about-to-be previous buffer has a given variable, open the
+"   new buffer with the `keepalt` option to make it so that the
+"   actual previous buffer (returned by things like `bufname('#')`)
+"   is the original buffer that was there before the first deletable
+"   buffer was opened.
+function! s:edit_deletable_buffer(varname, varvalue, path) abort
+    let l:edit_cmd = 'edit '
+    if getbufvar('%', a:varname) != ''
+        let l:edit_cmd = 'keepalt edit '
+    endif
+    execute l:edit_cmd . fnameescape(a:path)
+    call setbufvar('%', a:varname, a:varvalue)
+endfunction
+
+function! s:delete_dependency_buffers(varname, varvalue) abort
+    let l:cur_winnr = winnr()
+    for bnr in range(1, bufnr('$'))
+        if getbufvar(bnr, a:varname) == a:varvalue
+            " Delete this buffer if it is not shown in any window.
+            " Otherwise, display the alternate buffer before deleting
+            " it so the window is not closed.
+            let l:bwnr = bufwinnr(bnr)
+            if l:bwnr < 0 || getbufvar(bnr, 'lawrencium_quit_on_delete') == 1
+                if bufloaded(l:bnr)
+                    call s:trace("Deleting dependency buffer " . bnr)
+                    execute "bdelete! " . bnr
+                else
+                    call s:trace("Dependency buffer " . bnr . " is already unladed.")
+                endif
+            else
+                execute l:bwnr . "wincmd w"
+                " TODO: better handle case where there's no previous/alternate buffer?
+                if bufnr('#') > 0 && bufloaded(bufnr('#'))
+                    bprevious
+                    if bufloaded(l:bnr)
+                        call s:trace("Deleting dependency buffer " . bnr . " after buffer switching.")
+                        execute "bdelete! " . bnr
+                    else
+                        call s:trace("Dependency buffer " . bnr . " is unladed after buffer switching.")
+                    endif
+                else
+                    call s:trace("Deleting dependency buffer " . bnr . " and window.")
+                    bdelete!
+                endif
+            endif
+        endif
+    endfor
+    if l:cur_winnr != winnr()
+        execute l:cur_winnr . "wincmd w"
+    endif
 endfunction
 
 " }}}
@@ -318,6 +389,96 @@ augroup lawrencium_detect
     autocmd BufNewFile,BufReadPost *     call s:setup_buffer_commands()
     autocmd VimEnter               *     if expand('<amatch>')==''|call s:setup_buffer_commands()|endif
 augroup end
+
+" }}}
+
+" Buffer Object {{{
+
+" The prototype dictionary.
+let s:Buffer = {}
+
+" Constructor.
+function! s:Buffer.New(number) dict abort
+    let l:newBuffer = copy(self)
+    let l:newBuffer.nr = a:number
+    let l:newBuffer.var_backup = {}
+    let l:newBuffer.on_delete = []
+    let l:newBuffer.on_winleave = []
+    execute 'augroup lawrencium_buffer_' . a:number
+    execute '  autocmd!'
+    execute '  autocmd BufDelete <buffer=' . a:number . '> call s:buffer_on_delete(' . a:number . ')'
+    execute 'augroup end'
+    call s:trace("Built new buffer object for buffer: " . a:number)
+    return l:newBuffer
+endfunction
+
+function! s:Buffer.GetVar(var) dict abort
+    return getbufvar(self.nr, a:var)
+endfunction
+
+function! s:Buffer.SetVar(var, value) dict abort
+    if !has_key(self.var_backup, a:var)
+        self.var_backup[a:var] = getbufvar(self.nr, a:var)
+    endif
+    return setbufvar(self.nr, a:var, a:value)
+endfunction
+
+function! s:Buffer.RestoreVars() dict abort
+    for key in keys(self.var_backup)
+        setbufvar(self.nr, key, self.var_backup[key])
+    endfor
+endfunction
+
+function! s:Buffer.OnDelete(cmd) dict abort
+    call s:trace("Adding BufDelete callback for buffer " . self.nr . ": " . a:cmd)
+    call add(self.on_delete, a:cmd)
+endfunction
+
+function! s:Buffer.OnWinLeave(cmd) dict abort
+    if len(self.on_winleave) == 0
+        call s:trace("Adding BufWinLeave auto-command on buffer " . self.nr)
+        execute 'autocmd BufWinLeave <buffer=' . self.nr . '> call s:buffer_on_winleave(' . self.nr .')'
+    endif
+    call s:trace("Adding BufWinLeave callback for buffer " . self.nr . ": " . a:cmd)
+    call add(self.on_winleave, a:cmd)
+endfunction
+
+let s:buffer_objects = {}
+
+" Get a buffer instance for the specified buffer number, or the
+" current buffer if nothing is specified.
+function! s:buffer_obj(...) abort
+    let l:bufnr = a:0 ? a:1 : bufnr('%')
+    if !has_key(s:buffer_objects, l:bufnr)
+        let s:buffer_objects[l:bufnr] = s:Buffer.New(l:bufnr)
+    endif
+    return s:buffer_objects[l:bufnr]
+endfunction
+
+" Execute all the "on delete" callbacks.
+function! s:buffer_on_delete(number) abort
+    let l:bufobj = s:buffer_objects[a:number]
+    call s:trace("Calling BufDelete callbacks on buffer " . l:bufobj.nr)
+    for cmd in l:bufobj.on_delete
+        call s:trace(" [" . cmd . "]")
+        execute cmd
+    endfor
+    call s:trace("Deleted buffer object " . l:bufobj.nr)
+    call remove(s:buffer_objects, l:bufobj.nr)
+    execute 'augroup lawrencium_buffer_' . l:bufobj.nr
+    execute '  autocmd!'
+    execute 'augroup end'
+endfunction
+
+" Execute all the "on winleave" callbacks.
+function! s:buffer_on_winleave(number) abort
+    let l:bufobj = s:buffer_objects[a:number]
+    call s:trace("Calling BufWinLeave callbacks on buffer " . l:bufobj.nr)
+    for cmd in l:bufobj.on_winleave
+        call s:trace(" [" . cmd . "]")
+        execute cmd
+    endfor
+endfunction
 
 " }}}
 
@@ -508,7 +669,7 @@ function! s:HgStatus() abort
     command! -buffer          Hgstatusdiff      :call s:HgStatus_Diff(0)
     command! -buffer          Hgstatusvdiff     :call s:HgStatus_Diff(1)
     command! -buffer          Hgstatusdiffsum   :call s:HgStatus_DiffSummary(0)
-    command! -buffer          Hgstatusvdiffsum   :call s:HgStatus_DiffSummary(1)
+    command! -buffer          Hgstatusvdiffsum  :call s:HgStatus_DiffSummary(1)
     command! -buffer          Hgstatusrefresh   :call s:HgStatus_Refresh()
     command! -buffer -range   Hgstatusaddremove :call s:HgStatus_AddRemove(<line1>, <line2>)
     command! -buffer -range=% -bang Hgstatuscommit  :call s:HgStatus_Commit(<line1>, <line2>, <bang>0, 0)
@@ -1070,53 +1231,15 @@ function! s:HgLog(is_file, ...) abort
     endif
 
     " Clean up when the log buffer is deleted.
-    execute 'autocmd BufDelete <buffer> call s:HgLog_Delete(' . a:is_file . ', "' . fnameescape(l:temp_file) . '")'
+    let l:bufobj = s:buffer_obj()
+    call l:bufobj.OnDelete('call s:HgLog_Delete(' . l:bufobj.nr . ', "' . fnameescape(l:temp_file) . '")')
 endfunction
 
-function! s:HgLog_Delete(was_file, path)
-    let l:repo = s:hg_repo()
-    let l:orignr = winnr()
-    let l:origedit = b:lawrencium_original_path
-    let l:origroot = s:stripslash(b:mercurial_dir)
-    let l:origpath = s:stripslash(b:lawrencium_logged_path)
-    call s:trace("Cleaning up '" . a:path . "', opened from '" . l:origedit . "'")
-    " Delete any other buffer opened by this log.
-    " (buffers with Lawrencium paths that match this repo and filename)
-    for nr in range(1, winnr('$'))
-        let l:br = winbufnr(nr)
-        let l:bpath = bufname(l:br)
-        let l:bpath_comps = s:parse_lawrencium_path(l:bpath)
-        if l:bpath_comps['root'] != ''
-            let l:bpath_root = s:normalizepath(l:bpath_comps['root'])
-            let l:bpath_path = s:normalizepath(s:stripslash(l:bpath_comps['path']))
-            call s:trace("Comparing '".l:bpath_path."' and '".l:origpath."' for cleanup.")
-            if l:bpath_root == l:origroot && l:bpath_path == l:origpath
-                " Go to that window and switch to the previous buffer
-                " from the buffer with the file revision.
-                " Just switching away should delete the buffer since it
-                " has `bufhidden=delete`.
-                execute nr . 'wincmd w'
-                let l:altbufname = s:shellslash(bufname('#'))
-                if l:altbufname =~# '\v^lawrencium://'
-                    " This is a special Lawrencium buffer... it could be
-                    " a previously shown revision of the file opened with
-                    " this very `Hglog`, which we don't want to switch to.
-                    " Let's just default to editing the original file
-                    " again... not sure what else to do here...
-                    call s:trace("Reverting to editing: " . l:origedit)
-                    execute 'edit ' . l:origedit
-                else
-                    bprevious
-                endif
-            endif
-        endif
-    endfor
-    " Restore the current window if we switched away.
-    let l:curnr = winnr()
-    if l:curnr != l:orignr
-        execute l:orignr . 'wincmd w'
+function! s:HgLog_Delete(bufnr, path)
+    if g:lawrencium_auto_close_buffers
+        call s:delete_dependency_buffers('lawrencium_diff_for', a:bufnr)
+        call s:delete_dependency_buffers('lawrencium_rev_for', a:bufnr)
     endif
-    
     " Delete the temp file if it was created somehow.
     call s:clean_tempfile(a:path)
 endfunction
@@ -1130,9 +1253,13 @@ function! s:HgLog_FileRevEdit(...)
         let l:rev = s:HgLog_GetSelectedRev()
     endif
     let l:repo = s:hg_repo()
+    let l:bufobj = s:buffer_obj()
     let l:path = l:repo.GetLawrenciumPath(b:lawrencium_logged_path, 'rev', l:rev)
+
+    " Go to the window we were in before going in the log window,
+    " and open the revision there.
     wincmd p
-    execute 'edit ' . fnameescape(l:path)
+    call s:edit_deletable_buffer('lawrencium_rev_for', l:bufobj.nr, l:path)
 endfunction
 
 function! s:HgLog_Diff(...) abort
@@ -1144,9 +1271,13 @@ function! s:HgLog_Diff(...) abort
         let l:revs = s:HgLog_GetSelectedRev()
     endif
     let l:repo = s:hg_repo()
+    let l:bufobj = s:buffer_obj()
     let l:path = l:repo.GetLawrenciumPath(b:lawrencium_logged_path, 'diff', l:revs)
+
+    " Go to the window we were in before going in the log window,
+    " and open the diff there.
     wincmd p
-    execute 'edit ' . fnameescape(l:path)
+    call s:edit_deletable_buffer('lawrencium_diff_for', l:bufobj.nr, l:path)
 endfunction
 
 function! s:HgLog_GetSelectedRev(...) abort
@@ -1193,7 +1324,6 @@ function! s:HgAnnotate() abort
         setlocal filetype=hgannotate
     else
         " Store some info about the current buffer.
-        let l:cur_bufnr = bufnr('%')
         let l:cur_topline = line('w0') + &scrolloff
         let l:cur_line = line('.')
         let l:cur_wrap = &wrap
@@ -1208,10 +1338,20 @@ function! s:HgAnnotate() abort
         setlocal scrollbind nowrap nofoldenable foldcolumn=0
         setlocal filetype=hgannotate
 
-        " When the annotated window is closed, restore the settings we
-        " changed on the current buffer.
-        execute 'autocmd BufDelete <buffer> call s:HgAnnotate_Delete(' . l:cur_bufnr . ', ' . l:cur_wrap . ', ' . l:cur_foldenable . ')'
+        " When the annotated buffer is deleted, restore the settings we
+        " changed on the current buffer, and go back to that buffer.
+        let l:annotate_buffer = s:buffer_obj()
+        call l:annotate_buffer.OnDelete('execute bufwinnr(' . l:bufnr . ') . "wincmd w"')
+        call l:annotate_buffer.OnDelete('setlocal noscrollbind')
+        if l:cur_wrap
+            call l:annotate_buffer.OnDelete('setlocal wrap')
+        endif
+        if l:cur_foldenable
+            call l:annotate_buffer.OnDelete('setlocal foldenable')
+        endif
 
+        " Go to the line we were at in the source buffer when we
+        " opened the annotation window.
         execute l:cur_topline
         normal! zt
         execute l:cur_line
@@ -1220,7 +1360,7 @@ function! s:HgAnnotate() abort
         " Set the correct window width for the annotations.
         let l:column_count = strlen(matchstr(getline('.'), '[^:]*:')) + g:lawrencium_annotate_width_offset - 1
         execute "vertical resize " . l:column_count
-        set winfixwidth
+        setlocal winfixwidth
     endif
 
     " Make the annotate buffer a Lawrencium buffer.
@@ -1234,25 +1374,44 @@ function! s:HgAnnotate() abort
     if g:lawrencium_define_mappings
         nnoremap <buffer> <silent> <cr> :Hgannotatediffsum<cr>
     endif
+
+    " Clean up when the annotate buffer is deleted.
+    let l:bufobj = s:buffer_obj()
+    call l:bufobj.OnDelete('call s:HgAnnotate_Delete(' . l:bufobj.nr . ')')
 endfunction
 
-function! s:HgAnnotate_Delete(orig_bufnr, orig_wrap, orig_foldenable) abort
-    execute 'call setwinvar(bufwinnr(' . a:orig_bufnr . '), "&scrollbind", 0)'
-    if a:orig_wrap
-        execute 'call setwinvar(bufwinnr(' . a:orig_bufnr . '), "&wrap", 1)'
-    endif
-    if a:orig_foldenable
-        execute 'call setwinvar(bufwinnr(' . a:orig_bufnr . '), "&foldenable", 1)'
+function! s:HgAnnotate_Delete(bufnr) abort
+    if g:lawrencium_auto_close_buffers
+        call s:delete_dependency_buffers('lawrencium_diff_for', a:bufnr)
     endif
 endfunction
 
 function! s:HgAnnotate_DiffSummary() abort
+    " Get the path for the diff of the revision specified under the cursor.
     let l:line = getline('.')
     let l:rev_hash = matchstr(l:line, '\v[a-f0-9]{12}')
+
+    " Get the Lawrencium path for the diff, and the buffer object for the
+    " annotation.
     let l:repo = s:hg_repo()
     let l:path = l:repo.GetLawrenciumPath(b:lawrencium_annotated_path, 'diff', l:rev_hash)
-    execute b:lawrencium_annotated_bufnr . 'wincmd w'
-    execute 'keepalt rightbelow split ' . fnameescape(l:path)
+    let l:annotate_buffer = s:buffer_obj()
+
+    " Find a window already displaying diffs for this annotation.
+    let l:diff_winnr = s:find_buffer_window('lawrencium_diff_for', l:annotate_buffer.nr)
+    if l:diff_winnr == -1
+        " Not found... go back to the main source buffer and open a bottom 
+        " split with the diff for the specified revision.
+        execute bufwinnr(b:lawrencium_annotated_bufnr) . 'wincmd w'
+        execute 'rightbelow split ' . fnameescape(l:path)
+        let b:lawrencium_diff_for = l:annotate_buffer.nr
+        let b:lawrencium_quit_on_delete = 1
+    else
+        " Found! Use that window to open the diff.
+        execute l:diff_winnr . 'wincmd w'
+        execute 'edit ' . fnameescape(l:path)
+        let b:lawrencium_diff_for = l:annotate_buffer.nr
+    endif
 endfunction
 
 call s:AddMainCommand("Hgannotate :call s:HgAnnotate()")
