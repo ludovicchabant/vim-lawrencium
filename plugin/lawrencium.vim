@@ -648,8 +648,11 @@ function! s:HgStatus() abort
     if line('$') == 1
         " Buffer is empty, which means there are not changes...
         " Quit and display a message.
-        q
+        " TODO: figure out why the first `echom` doesn't show when alone.
+        bdelete
         echom "Nothing was modified."
+        echom ""
+        return
     endif
 
     execute "setlocal noreadonly"
