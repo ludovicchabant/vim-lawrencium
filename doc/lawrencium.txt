@@ -362,4 +362,11 @@ g:lawrencium_annotate_width_offset
                         set to display characters at the window border when
                         unwrapped lines are extending outside.
 
+                                                *lawrencium_auto_close_buffers*
+g:lawrencium_auto_close_buffers
+                        Specifies whether to auto-close buffers opened by
+                        Lawrencium. For instance, any diff summary buffer open
+                        by `Hglog` will be deleted when the log window
+                        disappears.
+
  vim:tw=78:et:ft=help:norl:

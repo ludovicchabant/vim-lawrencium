@@ -123,6 +123,11 @@ endfunction
 
 " Given a Lawrencium path (e.g: 'lawrencium:///repo/root_dir//foo/bar/file.py//rev=34'), extract
 " the repository root, relative file path and revision number/changeset ID.
+"
+" If a second argument exists, it must be:
+" - `relative`: to make the file path relative to the repository root.
+" - `absolute`: to make the file path absolute.
+"
 function! s:parse_lawrencium_path(lawrencium_path, ...)
     let l:repo_path = s:shellslash(a:lawrencium_path)
     if l:repo_path =~? '\v^lawrencium://'
@@ -634,44 +639,32 @@ call s:AddMainCommand("-bang -complete=customlist,s:CompleteHg -nargs=* Hg :call
 " Hgstatus {{{
 
 function! s:HgStatus() abort
-    " Get the repo and the `hg status` output.
+    " Get the repo and the Lawrencium path for `hg status`.
     let l:repo = s:hg_repo()
-    let l:status_text = l:repo.RunCommand('status')
-    if l:status_text ==# '\v%^\s*%$'
-        echo "Nothing modified."
+    let l:status_path = l:repo.GetLawrenciumPath('', 'status', '')
+
+    " Open the Lawrencium buffer in a new split window of the right size.
+    execute "rightbelow split " . l:status_path
+    if line('$') == 1
+        " Buffer is empty, which means there are not changes...
+        " Quit and display a message.
+        q
+        echom "Nothing was modified."
     endif
 
-    " Open a new temp buffer in a new window, jump to it,
-    " and paste the `hg status` output in there.
-    let l:temp_file = s:tempname('hg-status-', '.txt')
-    let l:status_lines = split(l:status_text, '\n')
-    split
+    execute "setlocal noreadonly"
     execute "setlocal winfixheight"
-    execute "setlocal winheight=" . (len(l:status_lines) + 1)
-    execute "resize " . (len(l:status_lines) + 1)
-    execute "edit " . l:temp_file
-    call append(0, l:status_lines)
-    call cursor(1, 1)
-    " Make sure it's deleted when we exit the window.
-    setlocal bufhidden=delete
-    
-    " Setup the buffer correctly: readonly, and with the correct repo linked
-    " to it.
-    let b:mercurial_dir = l:repo.root_dir
-    setlocal buftype=nofile
-    setlocal filetype=hgstatus
-
-    " Make commands available.
-    call s:DefineMainCommands()
+    execute "setlocal winheight=" . (line('$') + 1)
+    execute "resize " . (line('$') + 1)
 
     " Add some nice commands.
-    command! -buffer          Hgstatusedit      :call s:HgStatus_FileEdit()
-    command! -buffer          Hgstatusdiff      :call s:HgStatus_Diff(0)
-    command! -buffer          Hgstatusvdiff     :call s:HgStatus_Diff(1)
-    command! -buffer          Hgstatusdiffsum   :call s:HgStatus_DiffSummary(0)
-    command! -buffer          Hgstatusvdiffsum  :call s:HgStatus_DiffSummary(1)
-    command! -buffer          Hgstatusrefresh   :call s:HgStatus_Refresh()
-    command! -buffer -range   Hgstatusaddremove :call s:HgStatus_AddRemove(<line1>, <line2>)
+    command! -buffer          Hgstatusedit          :call s:HgStatus_FileEdit()
+    command! -buffer          Hgstatusdiff          :call s:HgStatus_Diff(0)
+    command! -buffer          Hgstatusvdiff         :call s:HgStatus_Diff(1)
+    command! -buffer          Hgstatusdiffsum       :call s:HgStatus_DiffSummary(0)
+    command! -buffer          Hgstatusvdiffsum      :call s:HgStatus_DiffSummary(1)
+    command! -buffer          Hgstatusrefresh       :call s:HgStatus_Refresh()
+    command! -buffer -range   Hgstatusaddremove     :call s:HgStatus_AddRemove(<line1>, <line2>)
     command! -buffer -range=% -bang Hgstatuscommit  :call s:HgStatus_Commit(<line1>, <line2>, <bang>0, 0)
     command! -buffer -range=% -bang Hgstatusvcommit :call s:HgStatus_Commit(<line1>, <line2>, <bang>0, 1)
     command! -buffer -range=% -nargs=+ Hgstatusqnew :call s:HgStatus_QNew(<line1>, <line2>, <f-args>)
@@ -694,20 +687,11 @@ function! s:HgStatus() abort
         vnoremap <buffer> <silent> <C-A> :Hgstatusaddremove<cr>
         vnoremap <buffer> <silent> <C-S> :Hgstatuscommit<cr>
     endif
-
-    " Make sure the file is deleted with the buffer.
-    autocmd BufDelete <buffer> call s:clean_tempfile(expand('<afile>:p'))
 endfunction
 
 function! s:HgStatus_Refresh() abort
-    " Get the repo and the `hg status` output.
-    let l:repo = s:hg_repo()
-    let l:status_text = l:repo.RunCommand('status')
-
-    " Replace the contents of the current buffer with it, and refresh.
-    let l:path = expand('%:p')
-    let l:status_lines = split(l:status_text, '\n')
-    call writefile(l:status_lines, l:path)
+    " Just re-edit the buffer, it will reload the contents by calling
+    " the matching Mercurial command.
     edit
 endfunction
 
@@ -1436,6 +1420,14 @@ function! s:ReadLawrenciumFile(path) abort
         else
             call l:repo.ReadCommandOutput('cat', '-r', l:comps['value'], l:full_path)
         endif
+    elseif l:comps['action'] == 'status'
+        " Status (`hg status`)
+        if l:comps['path'] == ''
+            call l:repo.ReadCommandOutput('status')
+        else
+            call l:repo.ReadCommandOutput('status', l:full_path)
+        endif
+        setlocal filetype=hgstatus
     elseif l:comps['action'] == 'diff'
         " Diff revisions (`hg diff`)
         let l:diffargs = []
