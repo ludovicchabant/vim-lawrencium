@@ -1460,6 +1460,7 @@ function! s:ReadLawrenciumFile(path) abort
         endif
         call l:repo.ReadCommandOutput('diff', l:diffargs)
         setlocal filetype=diff
+        setlocal nofoldenable
     elseif l:comps['action'] == 'annotate'
         " Annotate file
         call l:repo.ReadCommandOutput('annotate', '-c', '-n', '-u', '-d', '-q', l:full_path)
