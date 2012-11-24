@@ -198,6 +198,11 @@ function! s:edit_deletable_buffer(varname, varvalue, path) abort
     call setbufvar('%', a:varname, a:varvalue)
 endfunction
 
+" Deletes all buffers that have a given variable set to a given value.
+" For each buffer, if it is not shown in any window, it will be just deleted.
+" If it is shown in a window, that window will be switched to the alternate
+" buffer before the buffer is deleted, unless the `lawrencium_quit_on_delete`
+" variable is set to `1`, in which case the window is closed too.
 function! s:delete_dependency_buffers(varname, varvalue) abort
     let l:cur_winnr = winnr()
     for bnr in range(1, bufnr('$'))
@@ -216,13 +221,14 @@ function! s:delete_dependency_buffers(varname, varvalue) abort
             else
                 execute l:bwnr . "wincmd w"
                 " TODO: better handle case where there's no previous/alternate buffer?
-                if bufnr('#') > 0 && bufloaded(bufnr('#'))
-                    bprevious
+                let l:prev_bnr = bufnr('#')
+                if l:prev_bnr > 0 && bufloaded(l:prev_bnr)
+                    execute "buffer " . l:prev_bnr
                     if bufloaded(l:bnr)
-                        call s:trace("Deleting dependency buffer " . bnr . " after buffer switching.")
+                        call s:trace("Deleting dependency buffer " . bnr . " after switching to " . l:prev_bnr . " in window " . l:bwnr)
                         execute "bdelete! " . bnr
                     else
-                        call s:trace("Dependency buffer " . bnr . " is unladed after buffer switching.")
+                        call s:trace("Dependency buffer " . bnr . " is unladed after switching to " . l:prev_bnr)
                     endif
                 else
                     call s:trace("Deleting dependency buffer " . bnr . " and window.")
@@ -232,6 +238,7 @@ function! s:delete_dependency_buffers(varname, varvalue) abort
         endif
     endfor
     if l:cur_winnr != winnr()
+        call s:trace("Returning to window " . l:cur_winnr)
         execute l:cur_winnr . "wincmd w"
     endif
 endfunction
@@ -409,6 +416,7 @@ function! s:Buffer.New(number) dict abort
     let l:newBuffer.var_backup = {}
     let l:newBuffer.on_delete = []
     let l:newBuffer.on_winleave = []
+    let l:newBuffer.on_unload = []
     execute 'augroup lawrencium_buffer_' . a:number
     execute '  autocmd!'
     execute '  autocmd BufDelete <buffer=' . a:number . '> call s:buffer_on_delete(' . a:number . ')'
@@ -442,10 +450,25 @@ endfunction
 function! s:Buffer.OnWinLeave(cmd) dict abort
     if len(self.on_winleave) == 0
         call s:trace("Adding BufWinLeave auto-command on buffer " . self.nr)
-        execute 'autocmd BufWinLeave <buffer=' . self.nr . '> call s:buffer_on_winleave(' . self.nr .')'
+        execute 'augroup lawrencium_buffer_' . self.nr . '_winleave'
+        execute '  autocmd!'
+        execute '  autocmd BufWinLeave <buffer=' . self.nr . '> call s:buffer_on_winleave(' . self.nr .')'
+        execute 'augroup end'
     endif
     call s:trace("Adding BufWinLeave callback for buffer " . self.nr . ": " . a:cmd)
     call add(self.on_winleave, a:cmd)
+endfunction
+
+function! s:Buffer.OnUnload(cmd) dict abort
+    if len(self.on_unload) == 0
+        call s:trace("Adding BufUnload auto-command on buffer " . self.nr)
+        execute 'augroup lawrencium_buffer_' . self.nr . '_unload'
+        execute '  autocmd!'
+        execute '  autocmd BufUnload <buffer=' . self.nr . '> call s:buffer_on_unload(' . self.nr . ')'
+        execute 'augroup end'
+    endif
+    call s:trace("Adding BufUnload callback for buffer " . self.nr . ": " . a:cmd)
+    call add(self.on_unload, a:cmd)
 endfunction
 
 let s:buffer_objects = {}
@@ -483,6 +506,22 @@ function! s:buffer_on_winleave(number) abort
         call s:trace(" [" . cmd . "]")
         execute cmd
     endfor
+    execute 'augroup lawrencium_buffer_' . l:bufobj.nr . '_winleave'
+    execute '  autocmd!'
+    execute 'augroup end'
+endfunction
+
+" Execute all the "on unload" callbacks.
+function! s:buffer_on_unload(number) abort
+    let l:bufobj = s:buffer_objects[a:number]
+    call s:trace("Calling BufUnload callbacks on buffer " . l:bufobj.nr)
+    for cmd in l:bufobj.on_unload
+        call s:trace(" [" . cmd . "]")
+        execute cmd
+    endfor
+    execute 'augroup lawrencium_buffer_' . l:bufobj.nr . '_unload'
+    execute '  autocmd!'
+    execute 'augroup end'
 endfunction
 
 " }}}
@@ -1156,56 +1195,30 @@ call s:AddMainCommand("-bang -nargs=* -complete=customlist,s:ListRepoFiles Hgrev
 
 " Hglog, Hgrepolog {{{
 
-let s:log_style_file = expand("<sfile>:h:h") . "/resources/hg_log.style"
-
 function! s:HgLog(is_file, ...) abort
     " Get the file or directory to get the log from, or figure out
     " some nice defaults (the current file, or the whole repository).
     if a:is_file
-        let l:log_path = expand('%:p')
+        let l:path = expand('%:p')
     else
-        let l:log_path = '.'
-    endif
-
-    " If the file or directory is specified, get the absolute path.
-    let l:repo = s:hg_repo()
-    if a:0 == 1
-        let l:log_path = l:repo.GetFullPath(a:1)
-    endif
-
-    " Run the command.
-    if l:log_path == '.'
-        let l:output = l:repo.RunCommand('log', '--style', shellescape(s:log_style_file))
-    else
-        let l:output = l:repo.RunCommand('log', '--style', shellescape(s:log_style_file), l:log_path)
+        let l:path = ''
     endif
 
     " Remember the file that opened this log.
     let l:original_path = expand('%:p')
 
-    " Open a new temp buffer in the preview window, jump to it,
-    " and paste the `hg log` output in there.
-    let l:temp_file = s:tempname('hg-log-', '.txt')
-    execute "pedit " . l:temp_file
+    " Get the Lawrencium path for this `hg log`.
+    let l:repo = s:hg_repo()
+    let l:log_path = l:repo.GetLawrenciumPath(l:path, 'log', '')
+
+    " Open it in a preview window and jump to it.
+    execute 'pedit ' . l:log_path
     wincmd P
-    call append(0, split(l:output, '\n'))
-    call cursor(1, 1)
-
-    " Setup the buffer correctly: readonly, and with the correct repo linked
-    " to it, and deleted on close.
-    let b:mercurial_dir = l:repo.root_dir
-    let b:lawrencium_logged_path = l:repo.GetRelativePath(l:log_path)
-    let b:lawrencium_original_path = l:original_path
-    setlocal bufhidden=delete
-    setlocal buftype=nofile
-    setlocal filetype=hglog
-
-    " Make commands available.
-    call s:DefineMainCommands()
 
     " Add some other nice commands and mappings.
     command! -buffer -nargs=* Hglogdiff    :call s:HgLog_Diff(<f-args>)
     if a:is_file
+        let b:lawrencium_logged_path = l:repo.GetRelativePath(l:path)
         command! -buffer -nargs=? Hglogrevedit :call s:HgLog_FileRevEdit(<f-args>)
     endif
 
@@ -1219,16 +1232,14 @@ function! s:HgLog(is_file, ...) abort
 
     " Clean up when the log buffer is deleted.
     let l:bufobj = s:buffer_obj()
-    call l:bufobj.OnDelete('call s:HgLog_Delete(' . l:bufobj.nr . ', "' . fnameescape(l:temp_file) . '")')
+    call l:bufobj.OnDelete('call s:HgLog_Delete(' . l:bufobj.nr . ')')
 endfunction
 
-function! s:HgLog_Delete(bufnr, path)
+function! s:HgLog_Delete(bufnr)
     if g:lawrencium_auto_close_buffers
         call s:delete_dependency_buffers('lawrencium_diff_for', a:bufnr)
         call s:delete_dependency_buffers('lawrencium_rev_for', a:bufnr)
     endif
-    " Delete the temp file if it was created somehow.
-    call s:clean_tempfile(a:path)
 endfunction
 
 function! s:HgLog_FileRevEdit(...)
@@ -1407,6 +1418,8 @@ call s:AddMainCommand("Hgannotate :call s:HgAnnotate()")
 
 " Lawrencium files {{{
 
+let s:log_style_file = expand("<sfile>:h:h") . "/resources/hg_log.style"
+
 function! s:ReadLawrenciumFile(path) abort
     call s:trace("Reading Lawrencium file '" . a:path)
     let l:comps = s:parse_lawrencium_path(a:path)
@@ -1431,6 +1444,14 @@ function! s:ReadLawrenciumFile(path) abort
             call l:repo.ReadCommandOutput('status', l:full_path)
         endif
         setlocal filetype=hgstatus
+    elseif l:comps['action'] == 'log'
+        " Log (`hg log`)
+        if l:comps['path'] == ''
+            call l:repo.ReadCommandOutput('log', '--style', shellescape(s:log_style_file))
+        else
+            call l:repo.ReadCommandOutput('log', '--style', shellescape(s:log_style_file), l:full_path)
+        endif
+        setlocal filetype=hglog
     elseif l:comps['action'] == 'diff'
         " Diff revisions (`hg diff`)
         let l:diffargs = []
