@@ -425,6 +425,10 @@ function! s:Buffer.New(number) dict abort
     return l:newBuffer
 endfunction
 
+function! s:Buffer.GetName() dict abort
+    return bufname(self.nr)
+endfunction
+
 function! s:Buffer.GetVar(var) dict abort
     return getbufvar(self.nr, a:var)
 endfunction
@@ -1041,15 +1045,13 @@ function! s:HgDiffSummary(filename, split, ...) abort
     let l:path = expand(a:filename)
     call s:trace("Diff'ing revisions: '".l:revs."' on file: ".l:path)
     let l:special = l:repo.GetLawrenciumPath(l:path, 'diff', l:revs)
+    let l:cmd = 'edit '
     if a:split == 1
-        split
+        let l:cmd = 'rightbelow split '
     elseif a:split == 2
-        vsplit
+        let l:cmd = 'rightbelow vsplit '
     endif
-    execute 'edit ' . l:special
-    " Open all folds by default.
-    " TODO: maybe set `nofoldenable` instead?
-    %foldopen!
+    execute l:cmd . l:special
 endfunction
 
 call s:AddMainCommand("-nargs=* Hgdiffsum       :call s:HgDiffSummary('%:p', 0, <f-args>)")
@@ -1193,39 +1195,35 @@ call s:AddMainCommand("-bang -nargs=* -complete=customlist,s:ListRepoFiles Hgrev
 
 " }}}
 
-" Hglog, Hgrepolog {{{
+" Hglog, Hglogthis {{{
 
-function! s:HgLog(is_file, ...) abort
-    " Get the file or directory to get the log from, or figure out
-    " some nice defaults (the current file, or the whole repository).
-    if a:is_file
-        let l:path = expand('%:p')
+function! s:HgLog(...) abort
+    " Get the file or directory to get the log from.
+    " (empty string is for the whole repository)
+    let l:repo = s:hg_repo()
+    if a:0 > 0
+        let l:path = l:repo.GetRelativePath(expand(a:1))
     else
         let l:path = ''
     endif
 
-    " Remember the file that opened this log.
-    let l:original_path = expand('%:p')
-
-    " Get the Lawrencium path for this `hg log`.
-    let l:repo = s:hg_repo()
+    " Get the Lawrencium path for this `hg log`,
+    " open it in a preview window and jump to it.
     let l:log_path = l:repo.GetLawrenciumPath(l:path, 'log', '')
-
-    " Open it in a preview window and jump to it.
     execute 'pedit ' . l:log_path
     wincmd P
 
     " Add some other nice commands and mappings.
+    let l:is_file = (l:path != '' && filereadable(l:repo.GetFullPath(l:path)))
     command! -buffer -nargs=* Hglogdiff    :call s:HgLog_Diff(<f-args>)
-    if a:is_file
-        let b:lawrencium_logged_path = l:repo.GetRelativePath(l:path)
-        command! -buffer -nargs=? Hglogrevedit :call s:HgLog_FileRevEdit(<f-args>)
+    if l:is_file
+        command! -buffer Hglogrevedit :call s:HgLog_FileRevEdit()
     endif
 
     if g:lawrencium_define_mappings
         nnoremap <buffer> <silent> <cr> :Hglogdiff<cr>
-        nnoremap <buffer> <silent> q     :bdelete!<cr>
-        if a:is_file
+        nnoremap <buffer> <silent> q    :bdelete!<cr>
+        if l:is_file
             nnoremap <buffer> <silent> <C-E>  :Hglogrevedit<cr>
         endif
     endif
@@ -1242,17 +1240,12 @@ function! s:HgLog_Delete(bufnr)
     endif
 endfunction
 
-function! s:HgLog_FileRevEdit(...)
-    if a:0 > 0
-        " Revision was given manually.
-        let l:rev = a:1
-    else
-        " Revision should be parsed from the current line in the log.
-        let l:rev = s:HgLog_GetSelectedRev()
-    endif
+function! s:HgLog_FileRevEdit()
     let l:repo = s:hg_repo()
     let l:bufobj = s:buffer_obj()
-    let l:path = l:repo.GetLawrenciumPath(b:lawrencium_logged_path, 'rev', l:rev)
+    let l:rev = s:HgLog_GetSelectedRev()
+    let l:log_path = s:parse_lawrencium_path(l:bufobj.GetName())
+    let l:path = l:repo.GetLawrenciumPath(l:log_path['path'], 'rev', l:rev)
 
     " Go to the window we were in before going in the log window,
     " and open the revision there.
@@ -1270,7 +1263,8 @@ function! s:HgLog_Diff(...) abort
     endif
     let l:repo = s:hg_repo()
     let l:bufobj = s:buffer_obj()
-    let l:path = l:repo.GetLawrenciumPath(b:lawrencium_logged_path, 'diff', l:revs)
+    let l:log_path = s:parse_lawrencium_path(l:bufobj.GetName())
+    let l:path = l:repo.GetLawrenciumPath(l:log_path['path'], 'diff', l:revs)
 
     " Go to the window we were in before going in the log window,
     " and open the diff there.
@@ -1292,8 +1286,8 @@ function! s:HgLog_GetSelectedRev(...) abort
     return l:rev
 endfunction
 
-call s:AddMainCommand("-nargs=? -complete=customlist,s:ListRepoDirs  Hgrepolog  :call s:HgLog(0, <f-args>)")
-call s:AddMainCommand("-nargs=? -complete=customlist,s:ListRepoFiles Hglog      :call s:HgLog(1, <f-args>)")
+call s:AddMainCommand("Hglogthis  :call s:HgLog('%:p')")
+call s:AddMainCommand("-nargs=? -complete=customlist,s:ListRepoFiles Hglog  :call s:HgLog(<f-args>)")
 
 " }}}
 

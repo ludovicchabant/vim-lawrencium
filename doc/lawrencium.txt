@@ -154,20 +154,18 @@ All commands defined by |lawrencium| are local to each buffer.
 
                                                 *:Hglog*
 :Hglog
-                        Opens the history (log) for the currently edited file
-                        in a split window. Some extra-commands, along with 
+                        Opens the history (log) for the current repository
+                        in the |preview-window|. Some extra-commands, along with 
                         some default mappings, are available in this window.
                         See |lawrencium-log-window|.
 
                                                 *:Hglog_f*
 :Hglog {file}           Same as |:Hglog|, but opens the log for the specified
-                        file instead of the currently edited file.
+                        file or direcotry instead of the whole repository.
 
-                                                *:Hgrepolog*
-:Hgrepolog              Opens the history (log) for the whole repository in a
-                        split window. Some extra-commands, along with some
-                        default mappings, are available in this window.
-                        See |lawrencium-log-window|.
+                                                *:Hglogthis*
+:Hglogthis              Same as |:Hglog| but opens the history (log) for the
+                        currently edited file instead of the whole repository.
 
                                                 *:Hgannotate*
 :Hgannotate             Splits the current window to show annotations in the
@@ -275,7 +273,10 @@ following descriptions.
 :Hglogrevedit           Looks at the revision specified on the current line,
                         and opens that revision for edit in the previous
                         window (although as a read-only buffer).
-                        Mapped to |<CR>|.
+                        This is only valid if the logged path maps to a file
+                        (i.e. not a directory, and not the whole repository as
+                        with |:Hglog|).
+                        Mapped to |<C-E>|.
 
                                                 *:Hglogdiff*
 :Hglogdiff              Looks at the revision specified on the current line,
@@ -284,7 +285,7 @@ following descriptions.
                         opens that diff in the previous window.
                         It doesn't do anything if the cursor is on the last
                         line.
-                        Mapped to |<C-D>|.
+                        Mapped to |<CR>|.
 
                                                 *:Hglogdiff_r*
 :Hglogdiff {rev}        Same as |:Hglogdiff|, but opens a diff between the
