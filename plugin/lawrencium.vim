@@ -245,7 +245,7 @@ endfunction
 
 " }}}
 
-" Mercurial Repository {{{
+" Mercurial Repository Object {{{
 
 " Let's define a Mercurial repo 'class' using prototype-based object-oriented
 " programming.
@@ -527,6 +527,123 @@ function! s:buffer_on_unload(number) abort
     execute '  autocmd!'
     execute 'augroup end'
 endfunction
+
+" }}}
+
+" Lawrencium Files {{{
+
+" Read revision (`hg cat`)
+function! s:read_lawrencium_rev(repo, path_parts, full_path) abort
+    if a:path_parts['value'] == ''
+        call a:repo.ReadCommandOutput('cat', a:full_path)
+    else
+        call a:repo.ReadCommandOutput('cat', '-r', a:path_parts['value'], a:full_path)
+    endif
+endfunction
+
+" Status (`hg status`)
+function! s:read_lawrencium_status(repo, path_parts, full_path) abort
+    if a:path_parts['path'] == ''
+        call a:repo.ReadCommandOutput('status')
+    else
+        call a:repo.ReadCommandOutput('status', a:full_path)
+    endif
+    setlocal filetype=hgstatus
+endfunction
+
+" Log (`hg log`)
+let s:log_style_file = expand("<sfile>:h:h") . "/resources/hg_log.style"
+
+function! s:read_lawrencium_log(repo, path_parts, full_path) abort
+    if a:path_parts['path'] == ''
+        call a:repo.ReadCommandOutput('log', '--style', shellescape(s:log_style_file))
+    else
+        call a:repo.ReadCommandOutput('log', '--style', shellescape(s:log_style_file), a:full_path)
+    endif
+    setlocal filetype=hglog
+endfunction
+
+" Diff revisions (`hg diff`)
+function! s:read_lawrencium_diff(repo, path_parts, full_path) abort
+    let l:diffargs = []
+    let l:commaidx = stridx(a:path_parts['value'], ',')
+    if l:commaidx > 0
+        let l:rev1 = strpart(a:path_parts['value'], 0, l:commaidx)
+        let l:rev2 = strpart(a:path_parts['value'], l:commaidx + 1)
+        if l:rev1 == '-'
+            let l:diffargs = [ '-r', l:rev2 ]
+        elseif l:rev2 == '-'
+            let l:diffargs = [ '-r', l:rev1 ]
+        else
+            let l:diffargs = [ '-r', l:rev1, '-r', l:rev2 ]
+        endif
+    elseif a:path_parts['value'] != ''
+        let l:diffargs = [ '-c', a:path_parts['value'] ]
+    else
+        let l:diffargs = []
+    endif
+    if a:path_parts['path'] != '' && a:path_parts['path'] != '.'
+        call add(l:diffargs, a:full_path)
+    endif
+    call a:repo.ReadCommandOutput('diff', l:diffargs)
+    setlocal filetype=diff
+    setlocal nofoldenable
+endfunction
+
+" Annotate file
+function! s:read_lawrencium_annotate(repo, path_parts, full_path) abort
+    call a:repo.ReadCommandOutput('annotate', '-c', '-n', '-u', '-d', '-q', a:full_path)
+endfunction
+
+" Generic read
+let s:lawrencium_file_readers = {
+            \'rev': function('s:read_lawrencium_rev'),
+            \'log': function('s:read_lawrencium_log'),
+            \'diff': function('s:read_lawrencium_diff'),
+            \'status': function('s:read_lawrencium_status'),
+            \'annotate': function('s:read_lawrencium_annotate')
+            \}
+
+function! s:ReadLawrenciumFile(path) abort
+    call s:trace("Reading Lawrencium file: " . a:path)
+    let l:path_parts = s:parse_lawrencium_path(a:path)
+    if l:path_parts['root'] == ''
+        call s:throw("Can't get repository root from: " . a:path)
+    endif
+    if !has_key(s:lawrencium_file_readers, l:path_parts['action'])
+        call s:throw("No registered reader for action: " . l:path_parts['action'])
+    endif
+
+    " Call the registered reader.
+    let l:repo = s:hg_repo(l:path_parts['root'])
+    let l:full_path = l:repo.root_dir . l:path_parts['path']
+    let LawrenciumFileReader = s:lawrencium_file_readers[l:path_parts['action']]
+    call LawrenciumFileReader(l:repo, l:path_parts, l:full_path)
+
+    " Setup the new buffer.
+    setlocal readonly
+    setlocal nomodified
+    setlocal bufhidden=delete
+    setlocal buftype=nofile
+    goto
+
+    " Remember the repo it belongs to and make
+    " the Lawrencium commands available.
+    let b:mercurial_dir = l:repo.root_dir
+    call s:DefineMainCommands()
+
+    return ''
+endfunction
+
+function! s:WriteLawrenciumFile(path) abort
+    call s:trace("Writing Lawrencium file: " . a:path)
+endfunction
+
+augroup lawrencium_files
+  autocmd!
+  autocmd BufReadCmd  lawrencium://**//**//* exe s:ReadLawrenciumFile(expand('<amatch>'))
+  autocmd BufWriteCmd lawrencium://**//**//* exe s:WriteLawrenciumFile(expand('<amatch>'))
+augroup END
 
 " }}}
 
@@ -1407,94 +1524,6 @@ function! s:HgAnnotate_DiffSummary() abort
 endfunction
 
 call s:AddMainCommand("Hgannotate :call s:HgAnnotate()")
-
-" }}}
-
-" Lawrencium files {{{
-
-let s:log_style_file = expand("<sfile>:h:h") . "/resources/hg_log.style"
-
-function! s:ReadLawrenciumFile(path) abort
-    call s:trace("Reading Lawrencium file '" . a:path)
-    let l:comps = s:parse_lawrencium_path(a:path)
-    if l:comps['root'] == ''
-        call s:throw("Can't get repository root from: " . a:path)
-    endif
-
-    let l:repo = s:hg_repo(l:comps['root'])
-    let l:full_path = l:repo.root_dir . l:comps['path']
-    if l:comps['action'] == 'rev'
-        " Read revision (`hg cat`)
-        if l:comps['value'] == ''
-            call l:repo.ReadCommandOutput('cat', l:full_path)
-        else
-            call l:repo.ReadCommandOutput('cat', '-r', l:comps['value'], l:full_path)
-        endif
-    elseif l:comps['action'] == 'status'
-        " Status (`hg status`)
-        if l:comps['path'] == ''
-            call l:repo.ReadCommandOutput('status')
-        else
-            call l:repo.ReadCommandOutput('status', l:full_path)
-        endif
-        setlocal filetype=hgstatus
-    elseif l:comps['action'] == 'log'
-        " Log (`hg log`)
-        if l:comps['path'] == ''
-            call l:repo.ReadCommandOutput('log', '--style', shellescape(s:log_style_file))
-        else
-            call l:repo.ReadCommandOutput('log', '--style', shellescape(s:log_style_file), l:full_path)
-        endif
-        setlocal filetype=hglog
-    elseif l:comps['action'] == 'diff'
-        " Diff revisions (`hg diff`)
-        let l:diffargs = []
-        let l:commaidx = stridx(l:comps['value'], ',')
-        if l:commaidx > 0
-            let l:rev1 = strpart(l:comps['value'], 0, l:commaidx)
-            let l:rev2 = strpart(l:comps['value'], l:commaidx + 1)
-            if l:rev1 == '-'
-                let l:diffargs = [ '-r', l:rev2 ]
-            elseif l:rev2 == '-'
-                let l:diffargs = [ '-r', l:rev1 ]
-            else
-                let l:diffargs = [ '-r', l:rev1, '-r', l:rev2 ]
-            endif
-        elseif l:comps['value'] != ''
-            let l:diffargs = [ '-c', l:comps['value'] ]
-        else
-            let l:diffargs = []
-        endif
-        if l:comps['path'] != '' && l:comps['path'] != '.'
-            call add(l:diffargs, l:full_path)
-        endif
-        call l:repo.ReadCommandOutput('diff', l:diffargs)
-        setlocal filetype=diff
-        setlocal nofoldenable
-    elseif l:comps['action'] == 'annotate'
-        " Annotate file
-        call l:repo.ReadCommandOutput('annotate', '-c', '-n', '-u', '-d', '-q', l:full_path)
-    endif
-
-    " Setup the new buffer.
-    setlocal readonly
-    setlocal nomodified
-    setlocal bufhidden=delete
-    setlocal buftype=nofile
-    goto
-
-    " Remember the repo it belongs to and make
-    " the Lawrencium commands available.
-    let b:mercurial_dir = l:repo.root_dir
-    call s:DefineMainCommands()
-
-    return ''
-endfunction
-
-augroup lawrencium_files
-  autocmd!
-  autocmd BufReadCmd  lawrencium://**//**//* exe s:ReadLawrenciumFile(expand('<amatch>'))
-augroup END
 
 " }}}
 
