@@ -1314,7 +1314,7 @@ call s:AddMainCommand("-bang -nargs=* -complete=customlist,s:ListRepoFiles Hgrev
 
 " Hglog, Hglogthis {{{
 
-function! s:HgLog(...) abort
+function! s:HgLog(vertical, ...) abort
     " Get the file or directory to get the log from.
     " (empty string is for the whole repository)
     let l:repo = s:hg_repo()
@@ -1327,7 +1327,11 @@ function! s:HgLog(...) abort
     " Get the Lawrencium path for this `hg log`,
     " open it in a preview window and jump to it.
     let l:log_path = l:repo.GetLawrenciumPath(l:path, 'log', '')
-    execute 'pedit ' . l:log_path
+    if a:vertical
+        execute 'vertical pedit ' . l:log_path
+    else
+        execute 'pedit ' . l:log_path
+    endif
     wincmd P
 
     " Add some other nice commands and mappings.
@@ -1403,8 +1407,10 @@ function! s:HgLog_GetSelectedRev(...) abort
     return l:rev
 endfunction
 
-call s:AddMainCommand("Hglogthis  :call s:HgLog('%:p')")
-call s:AddMainCommand("-nargs=? -complete=customlist,s:ListRepoFiles Hglog  :call s:HgLog(<f-args>)")
+call s:AddMainCommand("Hglogthis  :call s:HgLog(0, '%:p')")
+call s:AddMainCommand("Hgvlogthis :call s:HgLog(1, '%:p')")
+call s:AddMainCommand("-nargs=? -complete=customlist,s:ListRepoFiles Hglog  :call s:HgLog(0, <f-args>)")
+call s:AddMainCommand("-nargs=? -complete=customlist,s:ListRepoFiles Hgvlog  :call s:HgLog(1, <f-args>)")
 
 " }}}
 
