@@ -881,6 +881,7 @@ function! s:HgStatus_AddRemove(linestart, lineend) abort
     let l:filenames = s:HgStatus_GetSelectedFiles(a:linestart, a:lineend, ['!', '?'])
     if len(l:filenames) == 0
         call s:error("No files to add or remove in selection or current line.")
+        return
     endif
 
     " Run `addremove` on those paths.
@@ -896,6 +897,7 @@ function! s:HgStatus_Commit(linestart, lineend, bang, vertical) abort
     let l:filenames = s:HgStatus_GetSelectedFiles(a:linestart, a:lineend, ['M', 'A', 'R'])
     if len(l:filenames) == 0
         call s:error("No files to commit in selection or file.")
+        return
     endif
 
     " Run `Hgcommit` on those paths.
@@ -924,6 +926,7 @@ function! s:HgStatus_QNew(linestart, lineend, patchname, ...) abort
     let l:filenames = s:HgStatus_GetSelectedFiles(a:linestart, a:lineend, ['M', 'A', 'R'])
     if len(l:filenames) == 0
         call s:error("No files in selection or file to create patch.")
+        return
     endif
 
     " Run `Hg qnew` on those paths.
@@ -942,6 +945,7 @@ function! s:HgStatus_QRefresh(linestart, lineend) abort
     let l:filenames = s:HgStatus_GetSelectedFiles(a:linestart, a:lineend, ['M', 'A', 'R'])
     if len(l:filenames) == 0
         call s:error("No files in selection or file to refresh the patch.")
+        return
     endif
 
     " Run `Hg qrefresh` on those paths.
