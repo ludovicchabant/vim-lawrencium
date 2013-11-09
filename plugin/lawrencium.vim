@@ -1016,6 +1016,30 @@ call s:AddMainCommand("-bang -nargs=? -complete=customlist,s:ListRepoFiles Hgedi
 
 " }}}
 
+" Hgvimgrep {{{
+
+function! s:HgVimGrep(bang, pattern, ...) abort
+    let l:repo = s:hg_repo()
+    let l:file_paths = []
+    if a:0 > 0
+        for ff in a:000
+            let l:full_ff = l:repo.GetFullPath(ff)
+            call add(l:file_paths, l:full_ff)
+        endfor
+    else
+        call add(l:file_paths, l:repo.root_dir . "**")
+    endif
+    if a:bang
+        execute "vimgrep! " . a:pattern . " " . join(l:file_paths, " ")
+    else
+        execute "vimgrep " . a:pattern . " " . join(l:file_paths, " ")
+    endif
+endfunction
+
+call s:AddMainCommand("-bang -nargs=+ -complete=customlist,s:ListRepoFiles Hgvimgrep :call s:HgVimGrep(<bang>0, <f-args>)")
+
+" }}}
+
 " Hgdiff, Hgvdiff {{{
 
 function! s:HgDiff(filename, vertical, ...) abort

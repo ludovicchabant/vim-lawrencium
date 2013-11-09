@@ -178,6 +178,12 @@ All commands defined by |lawrencium| are local to each buffer.
                         are available in this window.
                         See |lawrencium-annotate-window|.
 
+                                                *:Hgvimgrep*
+:Hgvimgrep              Runs a |:vimgrep| command inside the current
+                        repository. The files in which to search can be
+                        provided with repository-relative names. If no file is
+                        given, the search will be run in the whole repository.
+
 
 =============================================================================
 3.  Status Window                               *lawrencium-status-window*
