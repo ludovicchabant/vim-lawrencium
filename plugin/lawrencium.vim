@@ -895,10 +895,16 @@ function! s:HgStatus() abort
     endif
 endfunction
 
-function! s:HgStatus_Refresh() abort
-    " Just re-edit the buffer, it will reload the contents by calling
-    " the matching Mercurial command.
-    edit
+function! s:HgStatus_Refresh(...) abort
+    if a:0 == 0
+        " Just re-edit the buffer, it will reload the contents by calling
+        " the matching Mercurial command.
+        edit
+    else
+        " Re-edit the given buffer.
+        execute 'buf ' . a:1
+        edit
+    endif
 endfunction
 
 function! s:HgStatus_FileEdit() abort
@@ -943,8 +949,16 @@ function! s:HgStatus_Commit(linestart, lineend, bang, vertical) abort
         return
     endif
 
+    " Remember which buffer this is.
+    let l:status_nr = bufnr('%')
+
     " Run `Hgcommit` on those paths.
     call s:HgCommit(a:bang, a:vertical, l:filenames)
+
+    " At this point we should be in the commit message buffer.
+    " Let's refresh the status window when that buffer gets deleted.
+    let l:bufobj = s:buffer_obj()
+    call l:bufobj.OnDelete('call s:HgStatus_Refresh(' . l:status_nr . ')')
 endfunction
 
 function! s:HgStatus_Diff(vertical) abort
@@ -981,6 +995,9 @@ function! s:HgStatus_QNew(linestart, lineend, patchname, ...) abort
         call insert(l:filenames, l:message, 1)
     endif
     call l:repo.RunCommand('qnew', l:filenames)
+
+    " Refresh the status window.
+    call s:HgStatus_Refresh()
 endfunction
 
 function! s:HgStatus_QRefresh(linestart, lineend) abort
@@ -995,6 +1012,9 @@ function! s:HgStatus_QRefresh(linestart, lineend) abort
     let l:repo = s:hg_repo()
     call insert(l:filenames, '-s', 0)
     call l:repo.RunCommand('qrefresh', l:filenames)
+
+    " Refresh the status window.
+    call s:HgStatus_Refresh()
 endfunction
 
 
