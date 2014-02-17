@@ -864,7 +864,6 @@ function! s:HgStatus() abort
         return
     endif
 
-    execute "setlocal noreadonly"
     execute "setlocal winfixheight"
     execute "setlocal winheight=" . (line('$') + 1)
     execute "resize " . (line('$') + 1)
