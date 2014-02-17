@@ -281,6 +281,29 @@ defined in it. Also, unless the global |lawrencium_define_mappings| is set to
 `0`, some commands are mapped to keyboard shortcuts, as detailed in the
 following descriptions.
 
+                                                *:Hglogdiffsum*
+:Hglogdiffsum           Splits the previous window to show a diff summary (as
+                        returned by `hg diff`) of the change specified on
+                        the current line.
+                        Mapped to |<C-U>|.
+
+                                                *:Hglogdiffsum_r*
+:Hglogdiffsum {rev1} {rev2}
+                        Same as |:Hglogdiffsum| but shows a diff summary of
+                        the change between the two specified revisions. If
+                        only {rev1} is specified, the change at that revision
+                        will be shown.
+
+                                                *:Hglogvdiffsum*
+:Hglogvdiffsum          Same as |:Hglogdiffsum| but opens a vertical split
+                        instead of a horizontal one.
+                        Mapped to |<C-H>| and |<CR>|.
+
+                                                *:Hglogvdiffsum_r*
+:Hglogvdiffsum {rev1} {rev2}
+                        Same as |:Hglogdiffsum_r| but opens a vertical split
+                        instead of a horizontal one.
+
                                                 *:Hglogrevedit*
 :Hglogrevedit           Looks at the revision specified on the current line,
                         and opens that revision for edit in the previous
@@ -292,21 +315,28 @@ following descriptions.
 
                                                 *:Hglogdiff*
 :Hglogdiff              Looks at the revision specified on the current line,
-                        and runs an `hg diff` between that revision and the
-                        previously listed revision (in the line below). It
-                        opens that diff in the previous window.
-                        It doesn't do anything if the cursor is on the last
-                        line.
-                        Mapped to |<CR>|.
+                        and opens a Vim diff between that revision and its
+                        first parent.
+                        This is only valid if the logged path maps to a file
+                        (i.e. not a directory, and not the whole repository as
+                        with |:Hglog|).
+                        Mapped to |<C-D>|.
 
                                                 *:Hglogdiff_r*
-:Hglogdiff {rev}        Same as |:Hglogdiff|, but opens a diff between the
-                        specified revision and the working directory.
-
-                                                *:Hglogdiff_r_r*
 :Hglogdiff {rev1} {rev2}
                         Same as |:Hglogdiff|, but opens a diff between the
-                        two specified revisions.
+                        specified revisions. If only {rev1} is specified,
+                        opens a Vim diff between that revision and its first
+                        parent.
+
+                                                *:Hglogvdiff*
+:Hglogvdiff             Same as |:Hglogdiff|, but opens a vertical split
+                        instead of a horizontal one.
+
+                                                *:Hglogvdiff_r*
+:Hglogvdiff {rev1} {rev2}
+                        Same as |:Hglogdiff_r| but opens a vertical split
+                        instead of a horizontal one.
 
                                                 *lawrencium-log-mappings*
 A few other mappings are available in the log window:

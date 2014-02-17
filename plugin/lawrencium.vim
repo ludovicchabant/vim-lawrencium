@@ -49,6 +49,11 @@ function! s:stripslash(path)
     return fnamemodify(a:path, ':s?[/\\]$??')
 endfunction
 
+" Surrounds the given string with double quotes.
+function! s:addquotes(str)
+    return '"' . a:str . '"'
+endfunction
+
 " Normalizes the slashes in a path.
 function! s:normalizepath(path)
     if exists('+shellslash') && &shellslash
@@ -547,10 +552,11 @@ endfunction
 
 " Read revision (`hg cat`)
 function! s:read_lawrencium_rev(repo, path_parts, full_path) abort
-    if a:path_parts['value'] == ''
+    let l:rev = a:path_parts['value']
+    if l:rev == ''
         call a:repo.ReadCommandOutput('cat', a:full_path)
     else
-        call a:repo.ReadCommandOutput('cat', '-r', a:path_parts['value'], a:full_path)
+        call a:repo.ReadCommandOutput('cat', '-r', s:addquotes(l:rev), a:full_path)
     endif
 endfunction
 
@@ -587,11 +593,11 @@ function! s:read_lawrencium_diff(repo, path_parts, full_path) abort
         let l:rev1 = strpart(a:path_parts['value'], 0, l:commaidx)
         let l:rev2 = strpart(a:path_parts['value'], l:commaidx + 1)
         if l:rev1 == '-'
-            let l:diffargs = [ '-r', l:rev2 ]
+            let l:diffargs = [ '-r', s:addquotes(l:rev2) ]
         elseif l:rev2 == '-'
-            let l:diffargs = [ '-r', l:rev1 ]
+            let l:diffargs = [ '-r', s:addquotes(l:rev1) ]
         else
-            let l:diffargs = [ '-r', l:rev1, '-r', l:rev2 ]
+            let l:diffargs = [ '-r', s:addquotes(l:rev1), '-r', s:addquotes(l:rev2) ]
         endif
     elseif a:path_parts['value'] != ''
         let l:diffargs = [ '-c', a:path_parts['value'] ]
@@ -1112,7 +1118,16 @@ function! s:HgDiff(filename, vertical, ...) abort
     let l:rev1 = ''
     let l:rev2 = 'p1()'
     if a:0 == 1
-        let l:rev2 = a:1
+        if type(a:1) == type([])
+            if len(a:1) >= 2
+                let l:rev1 = a:1[0]
+                let l:rev2 = a:1[1]
+            elseif len(a:1) == 1
+                let l:rev2 = a:1[0]
+            endif
+        else
+            let l:rev2 = a:1
+        endif
     elseif a:0 == 2
         let l:rev1 = a:1
         let l:rev2 = a:2
@@ -1152,7 +1167,7 @@ function! s:HgDiff(filename, vertical, ...) abort
     if l:rev2 == ''
         execute l:diffsplit . ' ' . fnameescape(l:path)
     else
-        let l:rev_path = l:repo.GetLawrenciumPath(l:path, 'rev', l:rev1)
+        let l:rev_path = l:repo.GetLawrenciumPath(l:path, 'rev', l:rev2)
         execute l:diffsplit . ' ' . fnameescape(l:rev_path)
     endif
 endfunction
@@ -1242,7 +1257,15 @@ function! s:HgDiffSummary(filename, split, ...) abort
     " Otherwise, use the 1 or 2 revisions specified as extra parameters.
     let l:revs = ''
     if a:0 == 1
-        let l:revs = a:1
+        if type(a:1) == type([])
+            if len(a:1) >= 2
+                let l:revs = a:1[0] . ',' . a:1[1]
+            elseif len(a:1) == 1
+                let l:revs = a:1[0]
+            endif
+        else
+            let l:revs = a:1
+        endif
     elseif a:0 >= 2
         let l:revs = a:1 . ',' . a:2
     endif
@@ -1423,16 +1446,23 @@ function! s:HgLog(vertical, ...) abort
 
     " Add some other nice commands and mappings.
     let l:is_file = (l:path != '' && filereadable(l:repo.GetFullPath(l:path)))
-    command! -buffer -nargs=* Hglogdiff    :call s:HgLog_Diff(<f-args>)
+    command! -buffer -nargs=* Hglogdiffsum  :call s:HgLog_DiffSummary(0, <f-args>)
+    command! -buffer -nargs=* Hglogvdiffsum :call s:HgLog_DiffSummary(1, <f-args>)
     if l:is_file
-        command! -buffer Hglogrevedit :call s:HgLog_FileRevEdit()
+        command! -buffer Hglogrevedit        :call s:HgLog_FileRevEdit()
+        command! -buffer -nargs=* Hglogdiff  :call s:HgLog_Diff(0, <f-args>)
+        command! -buffer -nargs=* Hglogvdiff :call s:HgLog_Diff(1, <f-args>)
     endif
 
     if g:lawrencium_define_mappings
-        nnoremap <buffer> <silent> <cr> :Hglogdiff<cr>
-        nnoremap <buffer> <silent> q    :bdelete!<cr>
+        nnoremap <buffer> <silent> <C-U> :Hglogdiffsum<cr>
+        nnoremap <buffer> <silent> <C-H> :Hglogvdiffsum<cr>
+        nnoremap <buffer> <silent> <cr>  :Hglogvdiffsum<cr>
+        nnoremap <buffer> <silent> q     :bdelete!<cr>
         if l:is_file
             nnoremap <buffer> <silent> <C-E>  :Hglogrevedit<cr>
+            nnoremap <buffer> <silent> <C-D>  :Hglogdiff<cr>
+            nnoremap <buffer> <silent> <C-V>  :Hglogvdiff<cr>
         endif
     endif
 
@@ -1461,23 +1491,52 @@ function! s:HgLog_FileRevEdit()
     call s:edit_deletable_buffer('lawrencium_rev_for', l:bufobj.nr, l:path)
 endfunction
 
-function! s:HgLog_Diff(...) abort
+function! s:HgLog_Diff(vertical, ...) abort
+    let l:revs = []
     if a:0 >= 2
-        let l:revs = a:1 . ',' . a:2
+        let l:revs = [a:1, a:2]
     elseif a:0 == 1
-        let l:revs = a:1
+        let l:revs = [a:1, 'p1('.a:1.')']
     else
-        let l:revs = s:HgLog_GetSelectedRev()
+        let l:sel = s:HgLog_GetSelectedRev()
+        let l:revs = [l:sel, 'p1('.l:sel.')']
     endif
+
     let l:repo = s:hg_repo()
     let l:bufobj = s:buffer_obj()
     let l:log_path = s:parse_lawrencium_path(l:bufobj.GetName())
-    let l:path = l:repo.GetLawrenciumPath(l:log_path['path'], 'diff', l:revs)
+    let l:path = l:repo.GetFullPath(l:log_path['path'])
+
+    " Go to the window we were in before going to the log window,
+    " and open the split diff there.
+    wincmd p
+    call s:HgDiff(l:path, a:vertical, l:revs)
+endfunction
+
+function! s:HgLog_DiffSummary(vertical, ...) abort
+    let l:revs = []
+    if a:0 >= 2
+        let l:revs = [a:1, a:2]
+    elseif a:0 == 1
+        let l:revs = [a:1]
+    else
+        let l:revs = [s:HgLog_GetSelectedRev()]
+    endif
+
+    let l:split_type = 1
+    if a:vertical
+        let l:split_type = 2
+    endif
+
+    let l:repo = s:hg_repo()
+    let l:bufobj = s:buffer_obj()
+    let l:log_path = s:parse_lawrencium_path(l:bufobj.GetName())
+    let l:path = l:repo.GetFullPath(l:log_path['path'])
 
     " Go to the window we were in before going in the log window,
-    " and open the diff there.
+    " and split for the diff summary from there.
     wincmd p
-    call s:edit_deletable_buffer('lawrencium_diff_for', l:bufobj.nr, l:path)
+    call s:HgDiffSummary(l:path, l:split_type, l:revs)
 endfunction
 
 function! s:HgLog_GetSelectedRev(...) abort
