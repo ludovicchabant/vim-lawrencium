@@ -635,6 +635,7 @@ function! s:read_lawrencium_qseries(repo, path_parts, full_path) abort
         call append(l:idx, line)
         let l:idx = l:idx + 1
     endfor
+    call setbufvar(l:curbuffer, 'lawrencium_patchname_top', l:names[len(l:head) - 1])
     set filetype=hgqseries
 endfunction
 
@@ -1695,7 +1696,7 @@ endfunction
 
 function! s:HgQSeries_Goto() abort
     let l:repo = s:hg_repo()
-    let l:patchname = HgQSeries_GetCurrentPatchName()
+    let l:patchname = s:HgQSeries_GetCurrentPatchName()
     if len(l:patchname) == 0
         call s:error("No patch to go to here.")
         return
@@ -1706,7 +1707,7 @@ endfunction
 
 function! s:HgQSeries_Rename(...) abort
     let l:repo = s:hg_repo()
-    let l:current_name = HgQSeries_GetCurrentPatchName()
+    let l:current_name = s:HgQSeries_GetCurrentPatchName()
     if len(l:current_name) == 0
         call s:error("No patch to rename here.")
         return
@@ -1718,7 +1719,7 @@ endfunction
 
 function! s:HgQSeries_EditMessage() abort
     let l:repo = s:hg_repo()
-    let l:patchname = getbufvar('%', 'lawrencium_patchname_1')
+    let l:patchname = getbufvar('%', 'lawrencium_patchname_top')
     if len(l:patchname) == 0
         call s:error("No patch to edit here.")
         return
