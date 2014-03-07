@@ -1790,14 +1790,25 @@ function! lawrencium#statusline(...)
     if !exists('b:mercurial_dir')
         return ''
     endif
+    let l:repo = s:hg_repo()
     let l:prefix = (a:0 > 0 ? a:1 : '')
     let l:suffix = (a:0 > 1 ? a:2 : '')
     let l:branch = 'default'
-    let l:branch_file = s:hg_repo().GetFullPath('.hg/branch')
+    let l:branch_file = l:repo.GetFullPath('.hg/branch')
     if filereadable(l:branch_file)
         let l:branch = readfile(l:branch_file)[0]
     endif
-    return l:prefix . l:branch .  l:suffix
+    let l:bookmarks = ''
+    let l:bookmarks_file = l:repo.GetFullPath('.hg/bookmarks.current')
+    if filereadable(l:bookmarks_file)
+        let l:bookmarks = join(readfile(l:bookmarks_file), ', ')
+    endif
+    let l:line = l:prefix . l:branch
+    if strlen(l:bookmarks) > 0
+        let l:line = l:line . ' - ' . l:bookmarks
+    endif
+    let l:line = l:line . l:suffix
+    return l:line
 endfunction
 
 " Rescans the current buffer for setting up Mercurial commands.
