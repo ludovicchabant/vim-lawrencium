@@ -135,6 +135,7 @@ endfunction
 "
 function! s:parse_lawrencium_path(lawrencium_path, ...)
     let l:repo_path = s:shellslash(a:lawrencium_path)
+    let l:repo_path = substitute(l:repo_path, '\\ ', ' ', 'g')
     if l:repo_path =~? '\v^lawrencium://'
         let l:repo_path = strpart(l:repo_path, strlen('lawrencium://'))
     endif
@@ -325,7 +326,14 @@ function! s:HgRepo.GetCommand(command, ...) abort
         let l:arg_list = a:1
     endif
     let l:hg_command = g:lawrencium_hg_executable . ' --repository ' . shellescape(s:stripslash(self.root_dir))
-    let l:hg_command = l:hg_command . ' ' . a:command . ' ' . join(l:arg_list, ' ')
+    let l:hg_command = l:hg_command . ' ' . a:command
+    for l:arg in l:arg_list
+        if stridx(l:arg, ' ') >= 0
+            let l:hg_command = l:hg_command . ' "' . l:arg . '"'
+        else
+            let l:hg_command = l:hg_command . ' ' . l:arg
+        endif
+    endfor
     return l:hg_command
 endfunction
 
@@ -354,6 +362,7 @@ function! s:HgRepo.GetLawrenciumPath(path, action, value, ...) abort
     if a:0 == 0 || !a:1
         let l:path = self.GetRelativePath(a:path)
     endif
+    let l:path = escape(l:path, ' \')
     let l:result = 'lawrencium://' . s:stripslash(self.root_dir) . '//' . l:path
     if a:action !=? ''
         let l:result  = l:result . '//' . a:action
@@ -922,7 +931,7 @@ function! s:HgStatus_FileEdit() abort
         endif
     endfor
     wincmd p
-    execute 'edit ' . l:filename
+    execute 'edit ' . escape(l:filename, ' \')
 endfunction
 
 function! s:HgStatus_AddRemove(linestart, lineend) abort
