@@ -1411,6 +1411,9 @@ function! s:HgRevert(bang, ...) abort
     " Get the repo and run the command.
     let l:repo = s:hg_repo()
     call l:repo.RunCommand('revert', l:filenames)
+
+    " Re-edit the file to see the change.
+    edit
 endfunction
 
 call s:AddMainCommand("-bang -nargs=* -complete=customlist,s:ListRepoFiles Hgrevert :call s:HgRevert(<bang>0, <f-args>)")
