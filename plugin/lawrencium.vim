@@ -345,13 +345,22 @@ function! s:HgRepo.RunCommand(command, ...) abort
     return system(l:hg_command)
 endfunction
 
-" Runs a Mercurial command in the repo and read it output into the current
+" Runs a Mercurial command in the repo and reads its output into the current
 " buffer.
 function! s:HgRepo.ReadCommandOutput(command, ...) abort
+    function! s:PutOutputIntoBuffer(command_line)
+        let l:was_buffer_empty = (line('$') == 1 && getline(1) == '')
+        execute '0read!' . escape(a:command_line, '%#\')
+        if l:was_buffer_empty  " (Always true?)
+            " '0read' inserts before the cursor, leaving a blank line which needs to be deleted:
+            normal! Gdd
+        endif
+    endfunction
+
     let l:all_args = [a:command] + a:000
     let l:hg_command = call(self['GetCommand'], l:all_args, self)
     call s:trace("Running Mercurial command: " . l:hg_command)
-    execute '0read !' . escape(l:hg_command, '%#\')
+    call s:PutOutputIntoBuffer(l:hg_command)
 endfunction
 
 " Build a Lawrencium path for the given file and action.
