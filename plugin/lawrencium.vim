@@ -888,11 +888,13 @@ function! s:HgStatus() abort
     execute "resize " . (line('$') + 1)
 
     " Add some nice commands.
-    command! -buffer          Hgstatusedit          :call s:HgStatus_FileEdit()
+    command! -buffer          Hgstatusedit          :call s:HgStatus_FileEdit(0)
     command! -buffer          Hgstatusdiff          :call s:HgStatus_Diff(0)
     command! -buffer          Hgstatusvdiff         :call s:HgStatus_Diff(1)
-    command! -buffer          Hgstatusdiffsum       :call s:HgStatus_DiffSummary(0)
-    command! -buffer          Hgstatusvdiffsum      :call s:HgStatus_DiffSummary(1)
+    command! -buffer          Hgstatustabdiff       :call s:HgStatus_Diff(2)
+    command! -buffer          Hgstatusdiffsum       :call s:HgStatus_DiffSummary(1)
+    command! -buffer          Hgstatusvdiffsum      :call s:HgStatus_DiffSummary(2)
+    command! -buffer          Hgstatustabdiffsum    :call s:HgStatus_DiffSummary(3)
     command! -buffer          Hgstatusrefresh       :call s:HgStatus_Refresh()
     command! -buffer -range   Hgstatusaddremove     :call s:HgStatus_AddRemove(<line1>, <line2>)
     command! -buffer -range=% -bang Hgstatuscommit  :call s:HgStatus_Commit(<line1>, <line2>, <bang>0, 0)
@@ -905,7 +907,7 @@ function! s:HgStatus() abort
         nnoremap <buffer> <silent> <cr>  :Hgstatusedit<cr>
         nnoremap <buffer> <silent> <C-N> :call search('^[MARC\!\?I ]\s.', 'We')<cr>
         nnoremap <buffer> <silent> <C-P> :call search('^[MARC\!\?I ]\s.', 'Wbe')<cr>
-        nnoremap <buffer> <silent> <C-D> :Hgstatusdiff<cr>
+        nnoremap <buffer> <silent> <C-D> :Hgstatustabdiff<cr>
         nnoremap <buffer> <silent> <C-V> :Hgstatusvdiff<cr>
         nnoremap <buffer> <silent> <C-U> :Hgstatusdiffsum<cr>
         nnoremap <buffer> <silent> <C-H> :Hgstatusvdiffsum<cr>
@@ -925,22 +927,35 @@ function! s:HgStatus_Refresh() abort
     edit
 endfunction
 
-function! s:HgStatus_FileEdit() abort
+function! s:HgStatus_FileEdit(newtab) abort
     " Get the path of the file the cursor is on.
     let l:filename = s:HgStatus_GetSelectedFile()
-   
-    " If the file is already open in a window, jump to that window.
-    " Otherwise, jump to the previous window and open it there.
-    for nr in range(1, winnr('$'))
-        let l:br = winbufnr(nr)
-        let l:bpath = fnamemodify(bufname(l:br), ':p')
-        if l:bpath ==# l:filename
-            execute nr . 'wincmd w'
-            return
-        endif
-    endfor
-    wincmd p
+
+    let l:cleanupbufnr = -1
+    if a:newtab == 0
+        " If the file is already open in a window, jump to that window.
+        " Otherwise, jump to the previous window and open it there.
+        for nr in range(1, winnr('$'))
+            let l:br = winbufnr(nr)
+            let l:bpath = fnamemodify(bufname(l:br), ':p')
+            if l:bpath ==# l:filename
+                execute nr . 'wincmd w'
+                return
+            endif
+        endfor
+        wincmd p
+    else
+        " Just open a new tab so we can edit the file there.
+        " We don't use `tabedit` because it messes up the current window
+        " if it happens to be the same file.
+        " We'll just have to clean up the default empty buffer created.
+        tabnew
+        let l:cleanupbufnr = bufnr('%')
+    endif
     execute 'edit ' . escape(l:filename, ' \')
+    if l:cleanupbufnr >= 0
+        execute 'bdelete ' . l:cleanupbufnr
+    endif
 endfunction
 
 function! s:HgStatus_AddRemove(linestart, lineend) abort
@@ -971,21 +986,28 @@ function! s:HgStatus_Commit(linestart, lineend, bang, vertical) abort
     call s:HgCommit(a:bang, a:vertical, l:filenames)
 endfunction
 
-function! s:HgStatus_Diff(vertical) abort
+function! s:HgStatus_Diff(split) abort
     " Open the file and run `Hgdiff` on it.
-    call s:HgStatus_FileEdit()
-    call s:HgDiff('%:p', a:vertical)
+    " We also need to translate the split mode for it... if we already
+    " opened the file in a new tab, `HgDiff` only needs to do a vertical
+    " split (i.e. split=1).
+    let l:newtab = 0
+    let l:hgdiffsplit = a:split
+    if a:split == 2
+        let l:newtab = 1
+        let l:hgdiffsplit = 1
+    endif
+    call s:HgStatus_FileEdit(l:newtab)
+    call s:HgDiff('%:p', l:hgdiffsplit)
 endfunction
 
-function! s:HgStatus_DiffSummary(vertical) abort
+function! s:HgStatus_DiffSummary(split) abort
     " Get the path of the file the cursor is on.
     let l:path = s:HgStatus_GetSelectedFile()
-    let l:split_type = 1
-    if a:vertical
-        let l:split_type = 2
+    if a:split < 3
+        wincmd p
     endif
-    wincmd p
-    call s:HgDiffSummary(l:path, l:split_type)
+    call s:HgDiffSummary(l:path, a:split)
 endfunction
 
 function! s:HgStatus_QNew(linestart, lineend, patchname, ...) abort
@@ -1113,9 +1135,9 @@ call s:AddMainCommand("-bang -nargs=+ -complete=customlist,s:ListRepoFiles Hgvim
 
 " }}}
 
-" Hgdiff, Hgvdiff {{{
+" Hgdiff, Hgvdiff, Hgtabdiff {{{
 
-function! s:HgDiff(filename, vertical, ...) abort
+function! s:HgDiff(filename, split, ...) abort
     " Default revisions to diff: the working directory (null string) 
     " and the parent of the working directory (using Mercurial's revsets syntax).
     " Otherwise, use the 1 or 2 revisions specified as extra parameters.
@@ -1148,24 +1170,43 @@ function! s:HgDiff(filename, vertical, ...) abort
     let l:diff_buffers = []
 
     " Get the first file and open it.
+    let l:cleanupbufnr = -1
     if l:rev1 == ''
-        if bufexists(l:path)
-            execute 'buffer ' . fnameescape(l:path)
-        else
+        if a:split == 2
+            " Don't use `tabedit` here because if `l:path` is the same as
+            " the current path, it will also reload the buffer in the current
+            " tab/window for some reason, which causes all state to be lost
+            " (all folds get collapsed again, cursor is moved to start, etc.)
+            tabnew
+            let l:cleanupbufnr = bufnr('%')
             execute 'edit ' . fnameescape(l:path)
+        else
+            if bufexists(l:path)
+                execute 'buffer ' . fnameescape(l:path)
+            else
+                execute 'edit ' . fnameescape(l:path)
+            endif
         endif
         " Make it part of the diff group.
         call s:HgDiff_DiffThis()
     else
         let l:rev_path = l:repo.GetLawrenciumPath(l:path, 'rev', l:rev1)
+        if a:split == 2
+            " See comments above about avoiding `tabedit`.
+            tabnew
+            let l:cleanupbufnr = bufnr('%')
+        endif
         execute 'edit ' . fnameescape(l:rev_path)
         " Make it part of the diff group.
         call s:HgDiff_DiffThis()
     endif
+    if l:cleanupbufnr >= 0
+        execute 'bdelete ' . l:cleanupbufnr
+    endif
 
     " Get the second file and open it too.
     let l:diffsplit = 'diffsplit'
-    if a:vertical
+    if a:split >= 1
         let l:diffsplit = 'vertical diffsplit'
     endif
     if l:rev2 == ''
@@ -1250,10 +1291,11 @@ augroup end
 
 call s:AddMainCommand("-nargs=* Hgdiff :call s:HgDiff('%:p', 0, <f-args>)")
 call s:AddMainCommand("-nargs=* Hgvdiff :call s:HgDiff('%:p', 1, <f-args>)")
+call s:AddMainCommand("-nargs=* Hgtabdiff :call s:HgDiff('%:p', 2, <f-args>)")
 
 " }}}
 
-" Hgdiffsum, Hgdiffsumsplit, Hgvdiffsumsplit {{{
+" Hgdiffsum, Hgdiffsumsplit, Hgvdiffsumsplit, Hgtabdiffsum {{{
 
 function! s:HgDiffSummary(filename, split, ...) abort
     " Default revisions to diff: the working directory (null string) 
@@ -1285,6 +1327,8 @@ function! s:HgDiffSummary(filename, split, ...) abort
         let l:cmd = 'rightbelow split '
     elseif a:split == 2
         let l:cmd = 'rightbelow vsplit '
+    elseif a:split == 3
+        let l:cmd = 'tabedit '
     endif
     execute l:cmd . l:special
 endfunction
@@ -1292,6 +1336,7 @@ endfunction
 call s:AddMainCommand("-nargs=* Hgdiffsum       :call s:HgDiffSummary('%:p', 0, <f-args>)")
 call s:AddMainCommand("-nargs=* Hgdiffsumsplit  :call s:HgDiffSummary('%:p', 1, <f-args>)")
 call s:AddMainCommand("-nargs=* Hgvdiffsumsplit :call s:HgDiffSummary('%:p', 2, <f-args>)")
+call s:AddMainCommand("-nargs=* Hgtabdiffsum    :call s:HgDiffSummary('%:p', 3, <f-args>)")
 
 " }}}
 
@@ -1453,12 +1498,14 @@ function! s:HgLog(vertical, ...) abort
 
     " Add some other nice commands and mappings.
     let l:is_file = (l:path != '' && filereadable(l:repo.GetFullPath(l:path)))
-    command! -buffer -nargs=* Hglogdiffsum  :call s:HgLog_DiffSummary(0, <f-args>)
-    command! -buffer -nargs=* Hglogvdiffsum :call s:HgLog_DiffSummary(1, <f-args>)
+    command! -buffer -nargs=* Hglogdiffsum    :call s:HgLog_DiffSummary(1, <f-args>)
+    command! -buffer -nargs=* Hglogvdiffsum   :call s:HgLog_DiffSummary(2, <f-args>)
+    command! -buffer -nargs=* Hglogtabdiffsum :call s:HgLog_DiffSummary(3, <f-args>)
     if l:is_file
-        command! -buffer Hglogrevedit        :call s:HgLog_FileRevEdit()
-        command! -buffer -nargs=* Hglogdiff  :call s:HgLog_Diff(0, <f-args>)
-        command! -buffer -nargs=* Hglogvdiff :call s:HgLog_Diff(1, <f-args>)
+        command! -buffer Hglogrevedit          :call s:HgLog_FileRevEdit()
+        command! -buffer -nargs=* Hglogdiff    :call s:HgLog_Diff(0, <f-args>)
+        command! -buffer -nargs=* Hglogvdiff   :call s:HgLog_Diff(1, <f-args>)
+        command! -buffer -nargs=* Hglogtabdiff :call s:HgLog_Diff(2, <f-args>)
     endif
 
     if g:lawrencium_define_mappings
@@ -1468,7 +1515,7 @@ function! s:HgLog(vertical, ...) abort
         nnoremap <buffer> <silent> q     :bdelete!<cr>
         if l:is_file
             nnoremap <buffer> <silent> <C-E>  :Hglogrevedit<cr>
-            nnoremap <buffer> <silent> <C-D>  :Hglogdiff<cr>
+            nnoremap <buffer> <silent> <C-D>  :Hglogtabdiff<cr>
             nnoremap <buffer> <silent> <C-V>  :Hglogvdiff<cr>
         endif
     endif
@@ -1498,7 +1545,7 @@ function! s:HgLog_FileRevEdit()
     call s:edit_deletable_buffer('lawrencium_rev_for', l:bufobj.nr, l:path)
 endfunction
 
-function! s:HgLog_Diff(vertical, ...) abort
+function! s:HgLog_Diff(split, ...) abort
     let l:revs = []
     if a:0 >= 2
         let l:revs = [a:1, a:2]
@@ -1516,11 +1563,13 @@ function! s:HgLog_Diff(vertical, ...) abort
 
     " Go to the window we were in before going to the log window,
     " and open the split diff there.
-    wincmd p
-    call s:HgDiff(l:path, a:vertical, l:revs)
+    if a:split < 2
+        wincmd p
+    endif
+    call s:HgDiff(l:path, a:split, l:revs)
 endfunction
 
-function! s:HgLog_DiffSummary(vertical, ...) abort
+function! s:HgLog_DiffSummary(split, ...) abort
     let l:revs = []
     if a:0 >= 2
         let l:revs = [a:1, a:2]
@@ -1528,11 +1577,6 @@ function! s:HgLog_DiffSummary(vertical, ...) abort
         let l:revs = [a:1]
     else
         let l:revs = [s:HgLog_GetSelectedRev()]
-    endif
-
-    let l:split_type = 1
-    if a:vertical
-        let l:split_type = 2
     endif
 
     let l:repo = s:hg_repo()
@@ -1543,7 +1587,7 @@ function! s:HgLog_DiffSummary(vertical, ...) abort
     " Go to the window we were in before going in the log window,
     " and split for the diff summary from there.
     wincmd p
-    call s:HgDiffSummary(l:path, l:split_type, l:revs)
+    call s:HgDiffSummary(l:path, a:split, l:revs)
 endfunction
 
 function! s:HgLog_GetSelectedRev(...) abort

@@ -108,6 +108,14 @@ All commands defined by |lawrencium| are local to each buffer.
                                                 *:Hgvdiff_f*
 :Hgvdiff {revspec}      Same as |:Hgdiff_f| but uses a vertical split.
 
+                                                *:Hgtabdiff*
+:Hgtabdiff              Same as |:Hgdiff| but opens the diff with a vertical
+                        split in a new tab page.
+
+                                                *:Hgtabdiff_f*
+:Hgtabdiff {revspec}    Same as |:Hgdiff_f| but opens the diff with a vertical
+                        split in a new tab page.
+
                                                 *:Hgdiffsum*
 :Hgdiffsum              Shows the "diff summary" (the output of `hg diff`)
                         of the current file against its parent revision.
@@ -133,6 +141,14 @@ All commands defined by |lawrencium| are local to each buffer.
                         Same as |:Hgdiffsumsplit| and |:Hgdiffsumsplit_f|
                         respectively, but uses a vertical split window instead
                         of a horizontal split window.
+
+                                                *:Hgtabdiffsumsplit*
+                                                *:Hgtabdiffsumsplit_f*
+:Hgtabdiffsumsplit
+:Hgtabdiffsumsplit {revspec}
+                        Same as |:Hgdiffsumsplit| and |:Hgdiffsumsplit_f|
+                        respectively, but opens the diff summary with a
+                        vertical split in a new tab page.
 
                                                 *:Hgcommit*
 :Hgcommit               Opens a new window to edit a commit message into a
@@ -215,12 +231,17 @@ following descriptions.
                         current line, between the working directory version
                         and the parent revision version. Similar to running
                         |:Hgdiff| on that file.
-                        Mapped to <CTRL-D>.
 
                                                 *:Hgstatusvdiff*
 :Hgstatusvdiff          Similar to |:Hgstatusdiff|, but use a vertical split.
                         Similar to running |:Hgvdiff| on that file.
                         Mapped to <CTRL-V>.
+
+                                                *:Hgstatustabdiff*
+:Hgstatustabdiff        Similar to |:Hgstatusdiff|, but opens the split with a
+                        vertical split in a new tab page.
+                        Similar to running |:Hgtabdiff| on that file.
+                        Mapped to <CTRL-D>.
 
                                                 *:Hgstatusdiffsum*
 :Hgstatusdiffsum        Similar to |:Hgstatusdiff|, but show a diff summary,
@@ -233,6 +254,10 @@ following descriptions.
                         split.
                         Mapped to <CTRL-H>.
 
+                                                *:Hgstatustabdiffsum*
+:Hgstatustabdiffsum     Similar to |:Hgstatusdiffsum|, but opens the diff
+                        summary with a vertical split in a new tab page.
+
                                                 *:Hgstatuscommit*
 :Hgstatuscommit         Runs |:Hgcommit| on the files currently mentioned in
                         the buffer, or in the current selection. The first 
@@ -244,7 +269,6 @@ following descriptions.
                                                 *:Hgstatusvcommit*
 :Hgstatusvcommit        Similar to |:Hgstatuscommit|, but use a vertical
                         split, as with |:Hgvcommit|.
-                        Not mapped byd default.
 
                                                 *:Hgstatusrefresh*
 :Hgstatusrefresh        Refreshes the status window by running `hg status`
@@ -304,6 +328,13 @@ following descriptions.
                         Same as |:Hglogdiffsum_r| but opens a vertical split
                         instead of a horizontal one.
 
+                                                *:Hglogtabdiffsum*
+                                                *:Hglogtabdiffsum_r*
+:Hglogtabdiffsum
+:Hglogtabdiffsum {rev1} {rev2}
+                        Same as |:Hglogdiffsum| and |:Hglogdiffsum_r| but
+                        opens the diff summary in a new tab page.
+
                                                 *:Hglogrevedit*
 :Hglogrevedit           Looks at the revision specified on the current line,
                         and opens that revision for edit in the previous
@@ -337,6 +368,13 @@ following descriptions.
 :Hglogvdiff {rev1} {rev2}
                         Same as |:Hglogdiff_r| but opens a vertical split
                         instead of a horizontal one.
+
+                                                *:Hglogtabdiff*
+                                                *:Hglogtabdiff_r*
+:Hglogtabdiff
+:Hglogtabdiff {rev1} {rev2}
+                        Same as |:Hglogdiff| and |:Hglogdiff_r| but opens the
+                        diff with a vertical split in a new tab page.
 
                                                 *lawrencium-log-mappings*
 A few other mappings are available in the log window:
