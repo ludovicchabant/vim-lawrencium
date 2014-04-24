@@ -873,7 +873,7 @@ function! s:HgStatus() abort
 
     " Open the Lawrencium buffer in a new split window of the right size.
     execute "rightbelow split " . l:status_path
-    if line('$') == 1
+    if (line('$') == 1 && getline(1) == '')
         " Buffer is empty, which means there are not changes...
         " Quit and display a message.
         " TODO: figure out why the first `echom` doesn't show when alone.
