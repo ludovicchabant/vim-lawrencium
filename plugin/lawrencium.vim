@@ -371,7 +371,7 @@ function! s:HgRepo.GetLawrenciumPath(path, action, value, ...) abort
     if a:0 == 0 || !a:1
         let l:path = self.GetRelativePath(a:path)
     endif
-    let l:path = escape(l:path, ' \')
+    let l:path = fnameescape(l:path)
     let l:result = 'lawrencium://' . s:stripslash(self.root_dir) . '//' . l:path
     if a:action !=? ''
         let l:result  = l:result . '//' . a:action
