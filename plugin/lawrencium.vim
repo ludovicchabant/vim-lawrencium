@@ -798,7 +798,7 @@ endfunction
 " Include the generated HG usage file.
 let s:usage_file = expand("<sfile>:h:h") . "/resources/hg_usage.vim"
 if filereadable(s:usage_file)
-    execute "source " . s:usage_file
+    execute "source " . fnameescape(s:usage_file)
 else
     call s:error("Can't find the Mercurial usage file. Auto-completion will be disabled in Lawrencium.")
 endif
@@ -806,7 +806,7 @@ endif
 " Include the command file type mappings.
 let s:file_type_mappings = expand("<sfile>:h:h") . '/resources/hg_command_file_types.vim'
 if filereadable(s:file_type_mappings)
-    execute "source " . s:file_type_mappings
+    execute "source " . fnameescape(s:file_type_mappings)
 endif
 
 function! s:CompleteHg(ArgLead, CmdLine, CursorPos)
