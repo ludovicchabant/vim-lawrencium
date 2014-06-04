@@ -1200,7 +1200,7 @@ function! s:HgDiff(filename, split, ...) abort
         " Make it part of the diff group.
         call s:HgDiff_DiffThis()
     endif
-    if l:cleanupbufnr >= 0
+    if l:cleanupbufnr >= 0 && bufexists(l:cleanupbufnr)
         execute 'bdelete ' . l:cleanupbufnr
     endif
 
