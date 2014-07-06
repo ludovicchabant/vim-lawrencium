@@ -174,7 +174,8 @@ All commands defined by |lawrencium| are local to each buffer.
                         Opens the history (log) for the current repository
                         in the |preview-window|. Some extra-commands, along with 
                         some default mappings, are available in this window.
-                        See |lawrencium-log-window|.
+                        See |lawrencium-log-window|. In addition, you can pass
+                        the usual hg log arguments like -u username, -l limit, etc.
 
                                                 *:Hglog_f*
 :Hglog {file}           Same as |:Hglog|, but opens the log for the specified
@@ -183,6 +184,13 @@ All commands defined by |lawrencium| are local to each buffer.
                                                 *:Hglogthis*
 :Hglogthis              Same as |:Hglog| but opens the history (log) for the
                         currently edited file instead of the whole repository.
+
+                                                *:Hglogexport*
+:Hglogexport            Exports the commit under cursor to directory specified by
+                        env variable HG_EXPORT_PATCH_DIR. If this variable is not
+                        set, then it is exported to the current working directory
+                        of vim. On Unix, if the user specified an absolute path,
+                        then the env variable is ignored.
 
                                                 *:Hgannotate*
 :Hgannotate             Splits the current window to show annotations in the

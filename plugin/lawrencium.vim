@@ -40,6 +40,14 @@ if !exists('g:lawrencium_annotate_width_offset')
     let g:lawrencium_annotate_width_offset = 0
 endif
 
+if !exists('g:lawrencium_status_win_split_above')
+    let g:lawrencium_status_win_split_above = 0
+endif
+
+if !exists('g:lawrencium_status_win_split_even')
+    let g:lawrencium_status_win_split_even = 0
+endif
+
 " }}}
 
 " Utility {{{
@@ -595,10 +603,13 @@ endfunction
 let s:log_style_file = expand("<sfile>:h:h") . "/resources/hg_log.style"
 
 function! s:read_lawrencium_log(repo, path_parts, full_path) abort
+    let l:log_opts = join(split(a:path_parts['value'], ','))
+    let l:log_cmd = "log " . l:log_opts
+
     if a:path_parts['path'] == ''
-        call a:repo.ReadCommandOutput('log', '--style', shellescape(s:log_style_file))
+        call a:repo.ReadCommandOutput(l:log_cmd, '--style', shellescape(s:log_style_file))
     else
-        call a:repo.ReadCommandOutput('log', '--style', shellescape(s:log_style_file), a:full_path)
+        call a:repo.ReadCommandOutput(l:log_cmd, '--style', shellescape(s:log_style_file), a:full_path)
     endif
     setlocal filetype=hglog
 endfunction
@@ -872,7 +883,12 @@ function! s:HgStatus() abort
     let l:status_path = l:repo.GetLawrenciumPath('', 'status', '')
 
     " Open the Lawrencium buffer in a new split window of the right size.
-    execute "rightbelow split " . l:status_path
+    if g:lawrencium_status_win_split_above
+      execute "leftabove split " . l:status_path
+    else
+      execute "rightbelow split " . l:status_path
+    endif
+    
     if (line('$') == 1 && getline(1) == '')
         " Buffer is empty, which means there are not changes...
         " Quit and display a message.
@@ -884,8 +900,10 @@ function! s:HgStatus() abort
     endif
 
     execute "setlocal winfixheight"
-    execute "setlocal winheight=" . (line('$') + 1)
-    execute "resize " . (line('$') + 1)
+    if !g:lawrencium_status_win_split_even
+      execute "setlocal winheight=" . (line('$') + 1)
+      execute "resize " . (line('$') + 1)
+    endif
 
     " Add some nice commands.
     command! -buffer          Hgstatusedit          :call s:HgStatus_FileEdit(0)
@@ -1480,7 +1498,7 @@ function! s:HgLog(vertical, ...) abort
     " Get the file or directory to get the log from.
     " (empty string is for the whole repository)
     let l:repo = s:hg_repo()
-    if a:0 > 0
+    if a:0 > 0 && matchstr(a:1, '\v-*') == ""
         let l:path = l:repo.GetRelativePath(expand(a:1))
     else
         let l:path = ''
@@ -1488,7 +1506,13 @@ function! s:HgLog(vertical, ...) abort
 
     " Get the Lawrencium path for this `hg log`,
     " open it in a preview window and jump to it.
-    let l:log_path = l:repo.GetLawrenciumPath(l:path, 'log', '')
+    if a:0 > 0 && l:path != ""
+      let l:log_opts = join(a:000[1:-1], ',')
+    else
+      let l:log_opts = join(a:000, ',')
+    endif
+
+    let l:log_path = l:repo.GetLawrenciumPath(l:path, 'log', l:log_opts)
     if a:vertical
         execute 'vertical pedit ' . l:log_path
     else
@@ -1498,6 +1522,7 @@ function! s:HgLog(vertical, ...) abort
 
     " Add some other nice commands and mappings.
     let l:is_file = (l:path != '' && filereadable(l:repo.GetFullPath(l:path)))
+    command! -buffer -nargs=+ Hglogexport     :call s:HgLog_ExportPatch(<f-args>)
     command! -buffer -nargs=* Hglogdiffsum    :call s:HgLog_DiffSummary(1, <f-args>)
     command! -buffer -nargs=* Hglogvdiffsum   :call s:HgLog_DiffSummary(2, <f-args>)
     command! -buffer -nargs=* Hglogtabdiffsum :call s:HgLog_DiffSummary(3, <f-args>)
@@ -1604,10 +1629,35 @@ function! s:HgLog_GetSelectedRev(...) abort
     return l:rev
 endfunction
 
+function! s:HgLog_ExportPatch(...) abort
+    let l:patch_name = a:1
+    if !empty($HG_EXPORT_PATCH_DIR)
+      let l:is_patch_relative = (matchstr(l:patch_name, '\v^/') == "")
+      " Use the patch dir only if user has specified a relative path
+      " Only works on Unix. Not sure how to check on Windows.
+      if l:is_patch_relative
+        let l:patch_name = $HG_EXPORT_PATCH_DIR . "/" . l:patch_name
+      endif
+    endif
+
+    if a:0 == 2
+        let l:rev = a:2
+    else
+        let l:rev = s:HgLog_GetSelectedRev()
+    endif
+
+    let l:repo = s:hg_repo()
+    let l:export_args = ['-o', l:patch_name, '-r', l:rev]
+
+    call l:repo.RunCommand('export', l:export_args)
+
+    echom "Created patch: " . l:patch_name
+endfunction
+
 call s:AddMainCommand("Hglogthis  :call s:HgLog(0, '%:p')")
 call s:AddMainCommand("Hgvlogthis :call s:HgLog(1, '%:p')")
-call s:AddMainCommand("-nargs=? -complete=customlist,s:ListRepoFiles Hglog  :call s:HgLog(0, <f-args>)")
-call s:AddMainCommand("-nargs=? -complete=customlist,s:ListRepoFiles Hgvlog  :call s:HgLog(1, <f-args>)")
+call s:AddMainCommand("-nargs=* -complete=customlist,s:ListRepoFiles Hglog  :call s:HgLog(0, <f-args>)")
+call s:AddMainCommand("-nargs=* -complete=customlist,s:ListRepoFiles Hgvlog  :call s:HgLog(1, <f-args>)")
 
 " }}}
 
