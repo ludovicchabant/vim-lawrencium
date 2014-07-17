@@ -1522,10 +1522,10 @@ function! s:HgLog(vertical, ...) abort
 
     " Add some other nice commands and mappings.
     let l:is_file = (l:path != '' && filereadable(l:repo.GetFullPath(l:path)))
-    command! -buffer -nargs=+ Hglogexport     :call s:HgLog_ExportPatch(<f-args>)
     command! -buffer -nargs=* Hglogdiffsum    :call s:HgLog_DiffSummary(1, <f-args>)
     command! -buffer -nargs=* Hglogvdiffsum   :call s:HgLog_DiffSummary(2, <f-args>)
     command! -buffer -nargs=* Hglogtabdiffsum :call s:HgLog_DiffSummary(3, <f-args>)
+    command! -buffer -nargs=+ -complete=file Hglogexport :call s:HgLog_ExportPatch(<f-args>)
     if l:is_file
         command! -buffer Hglogrevedit          :call s:HgLog_FileRevEdit()
         command! -buffer -nargs=* Hglogdiff    :call s:HgLog_Diff(0, <f-args>)
@@ -1632,12 +1632,16 @@ endfunction
 function! s:HgLog_ExportPatch(...) abort
     let l:patch_name = a:1
     if !empty($HG_EXPORT_PATCH_DIR)
-      let l:is_patch_relative = (matchstr(l:patch_name, '\v^/') == "")
-      " Use the patch dir only if user has specified a relative path
-      " Only works on Unix. Not sure how to check on Windows.
-      if l:is_patch_relative
-        let l:patch_name = $HG_EXPORT_PATCH_DIR . "/" . l:patch_name
-      endif
+        " Use the patch dir only if user has specified a relative path
+        if has('win32')
+            let l:is_patch_relative = (matchstr(l:patch_name, '\v^([a-zA-Z]:)?\\') == "")
+        else
+            let l:is_patch_relative = (matchstr(l:patch_name, '\v^/') == "")
+        endif
+        if l:is_patch_relative
+            let l:patch_name = s:normalizepath(
+                s:stripslash($HG_EXPORT_PATCH_DIR) . "/" . l:patch_name)
+        endif
     endif
 
     if a:0 == 2
