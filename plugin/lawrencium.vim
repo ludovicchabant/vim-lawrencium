@@ -1417,6 +1417,7 @@ function! s:HgCommit_GenerateMessage(repo, filenames) abort
     let l:msg .= "HG: user: " . split(a:repo.RunCommand('showconfig ui.username'), '\n')[0] . "\n"
     let l:msg .= "HG: branch '" . split(a:repo.RunCommand('branch'), '\n')[0] . "'\n"
 
+    execute 'lcd ' . a:repo.root_dir
     if len(a:filenames)
         let l:status_lines = split(a:repo.RunCommand('status', a:filenames), "\n")
     else
