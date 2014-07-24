@@ -203,6 +203,28 @@ All commands defined by |lawrencium| are local to each buffer.
                         are available in this window.
                         See |lawrencium-annotate-window|.
 
+                                                *:Hgannotate_f*
+:Hgannotate {file}      Same as |:Hgannotate|, but opens {file} first with
+                        |:Hgedit|.
+
+                                                *:Hgannotate!_f*
+:Hgannotate! {file}     Same as |:Hgannotate_f|, but opens {file} with
+                        |:Hgedit!|.
+
+                                                *:Hgwannotate*
+:Hgwannotate            Same as |:Hgannotate|, but runs the command in
+                        `verbose` mode to get full user names and time of day.
+                        This results in a wider annotation column next to the
+                        file (hence the command name: "Hg wide annotate").
+
+                                                *:Hgwannotate_f*
+:Hgwannotate {file}     Same as |:Hgwannotate|, but opens {file} first with
+                        |:Hgedit|.
+
+                                                *:Hgwannotate!_f*
+:Hgwannotate! {file}    Same as |:Hgwannotate_f|, but opens {file} with
+                        |:Hgedit!|.
+
                                                 *:Hgvimgrep*
 :Hgvimgrep              Runs a |:vimgrep| command inside the current
                         repository. The files in which to search can be

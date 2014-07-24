@@ -643,7 +643,12 @@ endfunction
 
 " Annotate file
 function! s:read_lawrencium_annotate(repo, path_parts, full_path) abort
-    call a:repo.ReadCommandOutput('annotate', '-c', '-n', '-u', '-d', '-q', a:full_path)
+    let l:cmd_args = ['-c', '-n', '-u', '-d', 'q']
+    if a:path_parts['value'] == 'v=1'
+        call insert(l:cmd_args, '-v', 0)
+    endif
+    call add(l:cmd_args, a:full_path)
+    call a:repo.ReadCommandOutput('annotate', l:cmd_args)
 endfunction
 
 " MQ series
@@ -1125,7 +1130,7 @@ function! s:HgEdit(bang, filename) abort
     endif
 endfunction
 
-call s:AddMainCommand("-bang -nargs=? -complete=customlist,s:ListRepoFiles Hgedit :call s:HgEdit(<bang>0, <f-args>)")
+call s:AddMainCommand("-bang -nargs=1 -complete=customlist,s:ListRepoFiles Hgedit :call s:HgEdit(<bang>0, <f-args>)")
 
 " }}}
 
@@ -1668,12 +1673,18 @@ call s:AddMainCommand("-nargs=* -complete=customlist,s:ListRepoFiles Hgvlog  :ca
 
 " Hgannotate {{{
 
-function! s:HgAnnotate() abort
+function! s:HgAnnotate(bang, verbose, ...) abort
+    " Open the file to annotate if needed.
+    if a:0 > 0
+        call s:HgEdit(a:bang, a:1)
+    endif
+
     " Get the Lawrencium path for the annotated file.
     let l:path = expand('%:p')
     let l:bufnr = bufnr('%')
     let l:repo = s:hg_repo()
-    let l:annotation_path = l:repo.GetLawrenciumPath(l:path, 'annotate', '')
+    let l:value = a:verbose ? 'v=1' : ''
+    let l:annotation_path = l:repo.GetLawrenciumPath(l:path, 'annotate', l:value)
     
     " Check if we're trying to annotate something with local changes.
     let l:has_local_edits = 0
@@ -1725,9 +1736,14 @@ function! s:HgAnnotate() abort
         syncbind
 
         " Set the correct window width for the annotations.
-        let l:column_count = strlen(matchstr(getline('.'), '[^:]*:')) + g:lawrencium_annotate_width_offset - 1
-        execute "vertical resize " . l:column_count
-        setlocal winfixwidth
+        let l:last_token = match(getline('.'), '\v\d{4}:\s')
+        if l:last_token < 0
+            echoerr "Can't find the end of the annotation columns."
+        else
+            let l:column_count = l:last_token + 4 + g:lawrencium_annotate_width_offset
+            execute "vertical resize " . l:column_count
+            setlocal winfixwidth
+        endif
     endif
 
     " Make the annotate buffer a Lawrencium buffer.
@@ -1781,7 +1797,8 @@ function! s:HgAnnotate_DiffSummary() abort
     endif
 endfunction
 
-call s:AddMainCommand("Hgannotate :call s:HgAnnotate()")
+call s:AddMainCommand("-bang -nargs=? -complete=customlist,s:ListRepoFiles Hgannotate :call s:HgAnnotate(<bang>0, 0, <f-args>)")
+call s:AddMainCommand("-bang -nargs=? -complete=customlist,s:ListRepoFiles Hgwannotate :call s:HgAnnotate(<bang>0, 1, <f-args>)")
 
 " }}}
 
