@@ -643,7 +643,7 @@ endfunction
 
 " Annotate file
 function! s:read_lawrencium_annotate(repo, path_parts, full_path) abort
-    let l:cmd_args = ['-c', '-n', '-u', '-d', 'q']
+    let l:cmd_args = ['-c', '-n', '-u', '-d', '-q']
     if a:path_parts['value'] == 'v=1'
         call insert(l:cmd_args, '-v', 0)
     endif
@@ -1671,7 +1671,7 @@ call s:AddMainCommand("-nargs=* -complete=customlist,s:ListRepoFiles Hgvlog  :ca
 
 " }}}
 
-" Hgannotate {{{
+" Hgannotate, Hgwannotate {{{
 
 function! s:HgAnnotate(bang, verbose, ...) abort
     " Open the file to annotate if needed.
@@ -1736,11 +1736,17 @@ function! s:HgAnnotate(bang, verbose, ...) abort
         syncbind
 
         " Set the correct window width for the annotations.
-        let l:last_token = match(getline('.'), '\v\d{4}:\s')
+        if a:verbose
+            let l:last_token = match(getline('.'), '\v\d{4}:\s')
+            let l:token_end = 5
+        else
+            let l:last_token = match(getline('.'), '\v\d{2}:\s')
+            let l:token_end = 3
+        endif
         if l:last_token < 0
             echoerr "Can't find the end of the annotation columns."
         else
-            let l:column_count = l:last_token + 4 + g:lawrencium_annotate_width_offset
+            let l:column_count = l:last_token + l:token_end + g:lawrencium_annotate_width_offset
             execute "vertical resize " . l:column_count
             setlocal winfixwidth
         endif
