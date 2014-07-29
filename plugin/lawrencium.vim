@@ -62,6 +62,11 @@ function! s:addquotes(str)
     return '"' . a:str . '"'
 endfunction
 
+" Returns whether a path is absolute.
+function! s:isabspath(path)
+    return a:path =~# '\v^(\w\:)?[/\\]'
+endfunction
+
 " Normalizes the slashes in a path.
 function! s:normalizepath(path)
     if exists('+shellslash') && &shellslash
@@ -291,16 +296,17 @@ endfunction
 " Gets a full path given a repo-relative path.
 function! s:HgRepo.GetFullPath(path) abort
     let l:root_dir = self.root_dir
-    if a:path =~# '\v^[/\\]'
-        let l:root_dir = s:stripslash(l:root_dir)
+    if s:isabspath(a:path)
+        call s:throw("Expected relative path, got absolute path: " . a:path)`
     endif
     return l:root_dir . a:path
 endfunction
 
+" Gets a repo-relative path given any path.
 function! s:HgRepo.GetRelativePath(path) abort
-    execute 'cd! ' . self.root_dir
+    execute 'lcd! ' . self.root_dir
     let l:relative_path = fnamemodify(a:path, ':.')
-    execute 'cd! -'
+    execute 'lcd! -'
     return l:relative_path
 endfunction
 
