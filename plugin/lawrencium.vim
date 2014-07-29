@@ -366,8 +366,12 @@ function! s:HgRepo.ReadCommandOutput(command, ...) abort
         let l:was_buffer_empty = (line('$') == 1 && getline(1) == '')
         execute '0read!' . escape(a:command_line, '%#\')
         if l:was_buffer_empty  " (Always true?)
-            " '0read' inserts before the cursor, leaving a blank line which needs to be deleted:
-            normal! Gdd
+            " '0read' inserts before the cursor, leaving a blank line which
+            " needs to be deleted... but if there are folds in this thing, we
+            " must open them all first otherwise we could delete the whole
+            " contents of the last fold (since Vim may close them all by
+            " default).
+            normal! zRGdd
         endif
     endfunction
 
