@@ -1037,10 +1037,12 @@ endfunction
 function! s:HgStatus_DiffSummary(split) abort
     " Get the path of the file the cursor is on.
     let l:path = s:HgStatus_GetSelectedFile()
-    if a:split < 3
-        wincmd p
-    endif
-    call s:HgDiffSummary(l:path, a:split)
+    " Reuse the same diff summary window
+    let l:reuse_id = 'lawrencium_diffsum_for_' . bufnr('%')
+    let l:split_prev_win = (a:split < 3)
+    let l:args = {'reuse_id': l:reuse_id, 'use_prev_win': l:split_prev_win,
+                \'split_mode': a:split}
+    call s:HgDiffSummary(l:path, l:args)
 endfunction
 
 function! s:HgStatus_QNew(linestart, lineend, patchname, ...) abort
@@ -1330,7 +1332,7 @@ call s:AddMainCommand("-nargs=* Hgtabdiff :call s:HgDiff('%:p', 2, <f-args>)")
 
 " Hgdiffsum, Hgdiffsumsplit, Hgvdiffsumsplit, Hgtabdiffsum {{{
 
-function! s:HgDiffSummary(filename, split, ...) abort
+function! s:HgDiffSummary(filename, present_args, ...) abort
     " Default revisions to diff: the working directory (null string) 
     " and the parent of the working directory (using Mercurial's revsets syntax).
     " Otherwise, use the 1 or 2 revisions specified as extra parameters.
@@ -1355,15 +1357,61 @@ function! s:HgDiffSummary(filename, split, ...) abort
     let l:path = expand(a:filename)
     call s:trace("Diff'ing revisions: '".l:revs."' on file: ".l:path)
     let l:special = l:repo.GetLawrenciumPath(l:path, 'diff', l:revs)
+
+    " Build the correct edit command, and switch to the correct window, based
+    " on the presentation arguments we got.
+    if type(a:present_args) == type(0)
+        " Just got a split mode.
+        let l:valid_args = {'split_mode': a:present_args}
+    else
+        " Got complex args.
+        let l:valid_args = a:present_args
+    endif
+
+    " First, see if we should reuse an existing window based on some buffer
+    " variable.
+    let l:target_winnr = -1
+    let l:split = get(l:valid_args, 'split_mode', 0)
+    let l:reuse_id = get(l:valid_args, 'reuse_id', '')
+    if l:reuse_id != ''
+        let l:target_winnr = s:find_buffer_window(l:reuse_id, 1)
+        if l:target_winnr > 0 && l:split != 3
+            " Unless we'll be opening in a new tab, don't split anymore, since
+            " we found the exact window we wanted.
+            let l:split = 0
+        endif
+        call s:trace("Looking for window with '".l:reuse_id."', found: ".l:target_winnr)
+    endif
+    " If we didn't find anything, see if we should use the current or previous
+    " window.
+    if l:target_winnr < 0
+        let l:use_prev_win = get(l:valid_args, 'use_prev_win', 0)
+        if l:use_prev_win
+            let l:target_winnr = winnr('#')
+            call s:trace("Will use previous window: ".l:target_winnr)
+        endif
+    endif
+    " Now let's see what kind of split we want to use, if any.
     let l:cmd = 'edit '
-    if a:split == 1
+    if l:split == 1
         let l:cmd = 'rightbelow split '
-    elseif a:split == 2
+    elseif l:split == 2
         let l:cmd = 'rightbelow vsplit '
-    elseif a:split == 3
+    elseif l:split == 3
         let l:cmd = 'tabedit '
     endif
-    execute l:cmd . l:special
+    
+    " All good now, proceed.
+    if l:target_winnr > 0
+        execute l:target_winnr . "wincmd w"
+    endif
+    execute 'keepalt ' . l:cmd . l:special
+
+    " Set the reuse ID if we had one.
+    if l:reuse_id != ''
+        call s:trace("Setting reuse ID '".l:reuse_id."' on buffer: ".bufnr('%'))
+        call setbufvar('%', l:reuse_id, 1)
+    endif
 endfunction
 
 call s:AddMainCommand("-nargs=* Hgdiffsum       :call s:HgDiffSummary('%:p', 0, <f-args>)")
@@ -1627,8 +1675,11 @@ function! s:HgLog_DiffSummary(split, ...) abort
 
     " Go to the window we were in before going in the log window,
     " and split for the diff summary from there.
-    wincmd p
-    call s:HgDiffSummary(l:path, a:split, l:revs)
+    let l:reuse_id = 'lawrencium_diffsum_for_' . bufnr('%')
+    let l:split_prev_win = (a:split < 3)
+    let l:args = {'reuse_id': l:reuse_id, 'use_prev_win': l:split_prev_win,
+                \'split_mode': a:split}
+    call s:HgDiffSummary(l:path, l:args, l:revs)
 endfunction
 
 function! s:HgLog_GetSelectedRev(...) abort
