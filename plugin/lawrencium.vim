@@ -899,9 +899,9 @@ function! s:HgStatus() abort
 
     " Open the Lawrencium buffer in a new split window of the right size.
     if g:lawrencium_status_win_split_above
-      execute "leftabove split " . l:status_path
+      execute "keepalt leftabove split " . l:status_path
     else
-      execute "rightbelow split " . l:status_path
+      execute "keepalt rightbelow split " . l:status_path
     endif
     
     if (line('$') == 1 && getline(1) == '')
