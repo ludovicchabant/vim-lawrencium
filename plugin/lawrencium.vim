@@ -297,9 +297,9 @@ endfunction
 function! s:HgRepo.GetFullPath(path) abort
     let l:root_dir = self.root_dir
     if s:isabspath(a:path)
-        call s:throw("Expected relative path, got absolute path: " . a:path)`
+        call s:throw("Expected relative path, got absolute path: " . a:path)
     endif
-    return l:root_dir . a:path
+    return s:normalizepath(l:root_dir . a:path)
 endfunction
 
 " Gets a repo-relative path given any path.
