@@ -131,7 +131,7 @@ function! s:find_repo_root(path)
     let l:previous_path = ""
     while l:path != l:previous_path
         if isdirectory(l:path . '/.hg/store')
-            return simplify(fnamemodify(l:path, ':p'))
+            return s:normalizepath(simplify(fnamemodify(l:path, ':p')))
         endif
         let l:previous_path = l:path
         let l:path = fnamemodify(l:path, ':h')
