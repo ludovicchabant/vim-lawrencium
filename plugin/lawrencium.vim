@@ -797,6 +797,10 @@ function! s:ReadLawrenciumFile(path) abort
     endif
     goto
 
+    " Remember the real Lawrencium path, because Vim can fuck up the slashes
+    " on Windows.
+    let b:lawrencium_path = a:path
+
     " Remember the repo it belongs to and make
     " the Lawrencium commands available.
     let b:mercurial_dir = l:repo.root_dir
@@ -1030,7 +1034,25 @@ function! s:HgStatus() abort
     endif
 endfunction
 
-function! s:HgStatus_Refresh() abort
+function! s:HgStatus_Refresh(...) abort
+    if a:0 > 0
+        let l:win_nr = bufwinnr(a:1)
+        call s:trace("Switching back to status window ".l:win_nr)
+        if l:win_nr < 0
+            call s:throw("Can't find the status window anymore!")
+        endif
+        execute l:win_nr . 'wincmd w'
+        " Delete everything in the buffer, and re-read the status into it.
+        " TODO: In theory I would only have to do `edit` like below when we're
+        " already in the window, but for some reason Vim just goes bonkers and
+        " weird shit happens. I have no idea why, hence the work-around here
+        " to bypass the whole `BufReadCmd` auto-command altogether, and just
+        " edit the buffer in place.
+        normal! ggVGd
+        call s:ReadLawrenciumFile(b:lawrencium_path)
+        return
+    endif
+
     " Just re-edit the buffer, it will reload the contents by calling
     " the matching Mercurial command.
     edit
@@ -1092,7 +1114,9 @@ function! s:HgStatus_Commit(linestart, lineend, bang, vertical) abort
     endif
 
     " Run `Hgcommit` on those paths.
-    call s:HgCommit(a:bang, a:vertical, l:filenames)
+    let l:buf_nr = bufnr('%')
+    let l:callback = 'call s:HgStatus_Refresh('.l:buf_nr.')'
+    call s:HgCommit(a:bang, a:vertical, l:callback, l:filenames)
 endfunction
 
 function! s:HgStatus_Diff(split) abort
@@ -1499,7 +1523,7 @@ call s:AddMainCommand("-nargs=* Hgtabdiffsum    :call s:HgDiffSummary('%:p', 3, 
 
 " Hgcommit {{{
 
-function! s:HgCommit(bang, vertical, ...) abort
+function! s:HgCommit(bang, vertical, callback, ...) abort
     " Get the repo we'll be committing into.
     let l:repo = s:hg_repo()
 
@@ -1526,6 +1550,15 @@ function! s:HgCommit(bang, vertical, ...) abort
     " and make the buffer delete itself on exit.
     let b:mercurial_dir = l:repo.root_dir
     let b:lawrencium_commit_files = l:filenames
+    if type(a:callback) == type([])
+        let b:lawrencium_commit_pre_callback = a:callback[0]
+        let b:lawrencium_commit_post_callback = a:callback[1]
+        let b:lawrencium_commit_abort_callback = a:callback[2]
+    else
+        let b:lawrencium_commit_pre_callback = 0
+        let b:lawrencium_commit_post_callback = a:callback
+        let b:lawrencium_commit_abort_callback = 0
+    endif
     setlocal bufhidden=delete
     setlocal filetype=hgcommit
     if a:bang
@@ -1578,7 +1611,21 @@ function! s:HgCommit_Execute(log_file, show_output) abort
     " Check if the user actually saved a commit message.
     if !filereadable(a:log_file)
         call s:error("abort: Commit message not saved")
+        if exists('b:lawrencium_commit_abort_callback') &&
+                    \type(b:lawrencium_commit_abort_callback) == type("") &&
+                    \b:lawrencium_commit_abort_callback != ''
+            call s:trace("Executing abort callback: ".b:lawrencium_commit_abort_callback)
+            execute b:lawrencium_commit_abort_callback
+        endif
         return
+    endif
+
+    " Execute a pre-callback if there is one.
+    if exists('b:lawrencium_commit_pre_callback') &&
+                \type(b:lawrencium_commit_pre_callback) == type("") &&
+                \b:lawrencium_commit_pre_callback != ''
+        call s:trace("Executing pre callback: ".b:lawrencium_commit_pre_callback)
+        execute b:lawrencium_commit_pre_callback
     endif
 
     call s:trace("Committing with log file: " . a:log_file)
@@ -1601,10 +1648,18 @@ function! s:HgCommit_Execute(log_file, show_output) abort
             echom l:output_line
         endfor
     endif
+
+    " Execute a post-callback if there is one.
+    if exists('b:lawrencium_commit_post_callback') &&
+                \type(b:lawrencium_commit_post_callback) == type("") &&
+                \b:lawrencium_commit_post_callback != ''
+        call s:trace("Executing post callback: ".b:lawrencium_commit_post_callback)
+        execute b:lawrencium_commit_post_callback
+    endif
 endfunction
 
-call s:AddMainCommand("-bang -nargs=* -complete=customlist,s:ListRepoFiles Hgcommit :call s:HgCommit(<bang>0, 0, <f-args>)")
-call s:AddMainCommand("-bang -nargs=* -complete=customlist,s:ListRepoFiles Hgvcommit :call s:HgCommit(<bang>0, 1, <f-args>)")
+call s:AddMainCommand("-bang -nargs=* -complete=customlist,s:ListRepoFiles Hgcommit :call s:HgCommit(<bang>0, 0, 0, <f-args>)")
+call s:AddMainCommand("-bang -nargs=* -complete=customlist,s:ListRepoFiles Hgvcommit :call s:HgCommit(<bang>0, 1, 0, <f-args>)")
 
 " }}}
 
