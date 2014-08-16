@@ -310,6 +310,19 @@ function! s:HgRepo.GetRelativePath(path) abort
     return l:relative_path
 endfunction
 
+" Gets, and optionally creates, a temp folder for some operation in the `.hg`
+" directory.
+function! s:HgRepo.GetTempDir(path, ...) abort
+    let l:tmp_dir = self.GetFullPath('.hg/lawrencium/' . a:path)
+    if !isdirectory(l:tmp_dir)
+        if a:0 > 0 && !a:1
+            return ''
+        endif
+        call mkdir(l:tmp_dir, 'p')
+    endif
+    return l:tmp_dir
+endfunction
+
 " Gets a list of files matching a root-relative pattern.
 " If a flag is passed and is TRUE, a slash will be appended to all
 " directories.
@@ -468,6 +481,7 @@ function! s:Buffer.New(number) dict abort
     let l:newBuffer = copy(self)
     let l:newBuffer.nr = a:number
     let l:newBuffer.var_backup = {}
+    let l:newBuffer.cmd_names = {}
     let l:newBuffer.on_delete = []
     let l:newBuffer.on_winleave = []
     let l:newBuffer.on_unload = []
@@ -479,8 +493,12 @@ function! s:Buffer.New(number) dict abort
     return l:newBuffer
 endfunction
 
-function! s:Buffer.GetName() dict abort
-    return bufname(self.nr)
+function! s:Buffer.GetName(...) dict abort
+    let l:name = bufname(self.nr)
+    if a:0 > 0
+        let l:name = fnamemodify(l:name, a:1)
+    endif
+    return l:name
 endfunction
 
 function! s:Buffer.GetVar(var) dict abort
@@ -489,7 +507,7 @@ endfunction
 
 function! s:Buffer.SetVar(var, value) dict abort
     if !has_key(self.var_backup, a:var)
-        self.var_backup[a:var] = getbufvar(self.nr, a:var)
+        let self.var_backup[a:var] = getbufvar(self.nr, a:var)
     endif
     return setbufvar(self.nr, a:var, a:value)
 endfunction
@@ -498,6 +516,64 @@ function! s:Buffer.RestoreVars() dict abort
     for key in keys(self.var_backup)
         setbufvar(self.nr, key, self.var_backup[key])
     endfor
+endfunction
+
+function! s:Buffer.DefineCommand(name, ...) dict abort
+    if a:0 == 0
+        call s:throw("Not enough parameters for s:Buffer.DefineCommands()")
+    endif
+    if a:0 == 1
+        let l:flags = ''
+        let l:cmd = a:1
+    else
+        let l:flags = a:1
+        let l:cmd = a:2
+    endif
+    if has_key(self.cmd_names, a:name)
+        call s:throw("Command '".a:name."' is already defined in buffer ".self.nr)
+    endif
+    if bufnr('%') != self.nr
+        call s:throw("You must move to buffer ".self.nr."first before defining local commands")
+    endif
+    let self.cmd_names[a:name] = 1
+    let l:real_flags = ''
+    if type(l:flags) == type('')
+        let l:real_flags = l:flags
+    endif
+    execute 'command -buffer '.l:real_flags.' '.a:name.' '.l:cmd
+endfunction
+
+function! s:Buffer.DeleteCommand(name) dict abort
+    if !has_key(self.cmd_names, a:name)
+        call s:throw("Command '".a:name."' has not been defined in buffer ".self.nr)
+    endif
+    if bufnr('%') != self.nr
+        call s:throw("You must move to buffer ".self.nr."first before deleting local commands")
+    endif
+    execute 'delcommand '.a:name
+    call remove(self.cmd_names, a:name)
+endfunction
+
+function! s:Buffer.DeleteCommands() dict abort
+    if bufnr('%') != self.nr
+        call s:throw("You must move to buffer ".self.nr."first before deleting local commands")
+    endif
+    for name in keys(self.cmd_names)
+        execute 'delcommand '.name
+    endfor
+    let self.cmd_names = {}
+endfunction
+
+function! s:Buffer.MoveToFirstWindow() dict abort
+    let l:win_nr = bufwinnr(self.nr)
+    if l:win_nr < 0
+        if a:0 > 0 && a:1 == 0
+            return 0
+        endif
+        call s:throw("No windows currently showing buffer ".self.nr)
+    endif
+    execute l:win_nr.'wincmd w'
+    return 1
 endfunction
 
 function! s:Buffer.OnDelete(cmd) dict abort
