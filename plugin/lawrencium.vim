@@ -1276,18 +1276,18 @@ function! s:HgDiff(filename, split, ...) abort
     " Default revisions to diff: the working directory (null string) 
     " and the parent of the working directory (using Mercurial's revsets syntax).
     " Otherwise, use the 1 or 2 revisions specified as extra parameters.
-    let l:rev1 = ''
-    let l:rev2 = 'p1()'
+    let l:rev1 = 'p1()'
+    let l:rev2 = ''
     if a:0 == 1
         if type(a:1) == type([])
             if len(a:1) >= 2
                 let l:rev1 = a:1[0]
                 let l:rev2 = a:1[1]
             elseif len(a:1) == 1
-                let l:rev2 = a:1[0]
+                let l:rev1 = a:1[0]
             endif
         else
-            let l:rev2 = a:1
+            let l:rev1 = a:1
         endif
     elseif a:0 == 2
         let l:rev1 = a:1
@@ -1298,11 +1298,8 @@ function! s:HgDiff(filename, split, ...) abort
     " fancy filename modifiers.
     let l:repo = s:hg_repo()
     let l:path = expand(a:filename)
+    let l:diff_id = localtime()
     call s:trace("Diff'ing '".l:rev1."' and '".l:rev2."' on file: ".l:path)
-
-    " We'll keep a list of buffers in this diff, so when one exits, the
-    " others' 'diff' flag is turned off.
-    let l:diff_buffers = []
 
     " Get the first file and open it.
     let l:cleanupbufnr = -1
@@ -1323,7 +1320,7 @@ function! s:HgDiff(filename, split, ...) abort
             endif
         endif
         " Make it part of the diff group.
-        call s:HgDiff_DiffThis()
+        call s:HgDiff_DiffThis(l:diff_id)
     else
         let l:rev_path = l:repo.GetLawrenciumPath(l:path, 'rev', l:rev1)
         if a:split == 2
@@ -1333,16 +1330,18 @@ function! s:HgDiff(filename, split, ...) abort
         endif
         execute 'edit ' . fnameescape(l:rev_path)
         " Make it part of the diff group.
-        call s:HgDiff_DiffThis()
+        call s:HgDiff_DiffThis(l:diff_id)
     endif
     if l:cleanupbufnr >= 0 && bufloaded(l:cleanupbufnr)
         execute 'bdelete ' . l:cleanupbufnr
     endif
 
     " Get the second file and open it too.
-    let l:diffsplit = 'diffsplit'
+    " Don't use `diffsplit` because it will set `&diff` before we get a chance
+    " to save a bunch of local settings that we will want to restore later.
+    let l:diffsplit = 'split'
     if a:split >= 1
-        let l:diffsplit = 'vertical diffsplit'
+        let l:diffsplit = 'vsplit'
     endif
     if l:rev2 == ''
         execute l:diffsplit . ' ' . fnameescape(l:path)
@@ -1350,24 +1349,29 @@ function! s:HgDiff(filename, split, ...) abort
         let l:rev_path = l:repo.GetLawrenciumPath(l:path, 'rev', l:rev2)
         execute l:diffsplit . ' ' . fnameescape(l:rev_path)
     endif
+    call s:HgDiff_DiffThis(l:diff_id)
 endfunction
 
-function! s:HgDiff_DiffThis() abort
+function! s:HgDiff_DiffThis(diff_id) abort
     " Store some commands to run when we exit diff mode.
     " It's needed because `diffoff` reverts those settings to their default
     " values, instead of their previous ones.
-    if !&diff
-        call s:trace('Enabling diff mode on ' . bufname('%'))
-        let w:lawrencium_diffoff = {}
-        let w:lawrencium_diffoff['&diff'] = 0
-        let w:lawrencium_diffoff['&wrap'] = &l:wrap
-        let w:lawrencium_diffoff['&scrollopt'] = &l:scrollopt
-        let w:lawrencium_diffoff['&scrollbind'] = &l:scrollbind
-        let w:lawrencium_diffoff['&cursorbind'] = &l:cursorbind
-        let w:lawrencium_diffoff['&foldmethod'] = &l:foldmethod
-        let w:lawrencium_diffoff['&foldcolumn'] = &l:foldcolumn
-        diffthis
+    if &diff
+        call s:throw("Calling diffthis too late on a buffer!")
+        return
     endif
+    call s:trace('Enabling diff mode on ' . bufname('%'))
+    let w:lawrencium_diffoff = {}
+    let w:lawrencium_diffoff['&diff'] = 0
+    let w:lawrencium_diffoff['&wrap'] = &l:wrap
+    let w:lawrencium_diffoff['&scrollopt'] = &l:scrollopt
+    let w:lawrencium_diffoff['&scrollbind'] = &l:scrollbind
+    let w:lawrencium_diffoff['&cursorbind'] = &l:cursorbind
+    let w:lawrencium_diffoff['&foldmethod'] = &l:foldmethod
+    let w:lawrencium_diffoff['&foldcolumn'] = &l:foldcolumn
+    let w:lawrencium_diff_id = a:diff_id
+    diffthis
+    autocmd BufWinLeave <buffer> call s:HgDiff_CleanUp()
 endfunction
 
 function! s:HgDiff_DiffOff(...) abort
@@ -1388,10 +1392,10 @@ function! s:HgDiff_DiffOff(...) abort
     endif
 endfunction
 
-function! s:HgDiff_GetDiffWindows() abort
+function! s:HgDiff_GetDiffWindows(diff_id) abort
     let l:result = []
     for nr in range(1, winnr('$'))
-        if getwinvar(nr, '&diff')
+        if getwinvar(nr, '&diff') && getwinvar(nr, 'lawrencium_diff_id') == a:diff_id
             call add(l:result, nr)
         endif
     endfor
@@ -1399,14 +1403,14 @@ function! s:HgDiff_GetDiffWindows() abort
 endfunction
 
 function! s:HgDiff_CleanUp() abort
-    " If we're not leaving a diff window, do nothing.
-    if !&diff
+    " If we're not leaving one of our diff window, do nothing.
+    if !&diff || !exists('w:lawrencium_diff_id')
         return
     endif
 
     " If there will be only one diff window left (plus the one we're leaving),
-    " turn off diff everywhere.
-    let l:nrs = s:HgDiff_GetDiffWindows()
+    " turn off diff in it and restore its local settings.
+    let l:nrs = s:HgDiff_GetDiffWindows(w:lawrencium_diff_id)
     if len(l:nrs) <= 2
         call s:trace('Disabling diff mode in ' . len(l:nrs) . ' windows.')
         for nr in l:nrs
@@ -1418,11 +1422,6 @@ function! s:HgDiff_CleanUp() abort
         call s:trace('Still ' . len(l:nrs) . ' diff windows open.')
     endif
 endfunction
-
-augroup lawrencium_diff
-  autocmd!
-  autocmd BufWinLeave * call s:HgDiff_CleanUp()
-augroup end
 
 call s:AddMainCommand("-nargs=* Hgdiff :call s:HgDiff('%:p', 0, <f-args>)")
 call s:AddMainCommand("-nargs=* Hgvdiff :call s:HgDiff('%:p', 1, <f-args>)")
@@ -1770,10 +1769,10 @@ function! s:HgLog_Diff(split, ...) abort
     if a:0 >= 2
         let l:revs = [a:1, a:2]
     elseif a:0 == 1
-        let l:revs = [a:1, 'p1('.a:1.')']
+        let l:revs = ['p1('.a:1.')', a:1]
     else
         let l:sel = s:HgLog_GetSelectedRev()
-        let l:revs = [l:sel, 'p1('.l:sel.')']
+        let l:revs = ['p1('.l:sel.')', l:sel]
     endif
 
     let l:repo = s:hg_repo()
