@@ -236,6 +236,42 @@ All commands defined by |lawrencium| are local to each buffer.
                         current patch series, with indicators about which
                         patches are applied, and which ones are not.
 
+                                                *:Hgrecord*
+:Hgrecord               Starts a "record" operation on the current buffer,
+                        i.e. an operation where you can commit a selected
+                        subset of all the changes made to a file.
+
+                        This actually doesn't run `hg record`, but serves the
+                        exact same purpose, hence the name.
+
+                        When the command is run, a diff window will be opened
+                        between the current buffer and the parent revision's
+                        version of the same file. You can then start
+                        "recording" changes (by using |do| from the parent
+                        revision window, or |dp| from the working directory
+                        version). Changes "recorded" into the parent revision
+                        window will be committed when that window is closed,
+                        so when you're done recording changes, you can just
+                        run |:wq|. You can also run |:Hgrecordcommit|, or
+                        |:Hgrecordabort| if you want to abort.
+                        
+                        When running |:Hgrecordcommit|, or |:wq| from the
+                        parent revision window, a commit window will show up.
+                        As with the normal commit window, a commit message
+                        should be entered, and |:wq| should be run again.
+                        Running |:q!| when the commit message hasn't been
+                        saved will abort the record operation.
+
+                        To summarize:
+
+                        * |:Hgrecord| to start a record operation
+                        * Use |do| and |]c| to move from diff hunk to diff
+                          hunk, recording those you want to commit.
+                        * |:Hgrecordabort| to abort, |:wq| to commit.
+                        * If committing, enter the commit message in the
+                          commit window, and |:wq| again.
+                        * Done!
+
 
 =============================================================================
 3.  Status Window                               *lawrencium-status-window*
@@ -505,5 +541,26 @@ g:lawrencium_auto_close_buffers
                         Lawrencium. For instance, any diff summary buffer open
                         by `Hglog` will be deleted when the log window
                         disappears.
+
+                                                *lawrencium_status_win_split_above*
+g:lawrencium_status_win_split_above
+                        If set to 1, |Hgstatus| will open in a split window
+                        above the current window, instead of below.
+                        Defaults to `0`.
+                        
+                                                *lawrencium_status_win_split_even*
+g:lawrencium_status_win_split_even
+                        If set to 1, |Hgstatus| will open a split window by
+                        splitting the current window in half. Otherwise, it
+                        will open a split window of roughly the size needed to
+                        show all modified files.
+                        Defaults to `0`.
+
+                                                *lawrencium_record_start_in_working_buffer*
+g:lawrencium_record_start_in_working_buffer
+                        If set to 1, |Hgrecord| will leave focus in the
+                        working directory buffer, instead of the recording
+                        buffer.
+                        Defaults to `0`.
 
  vim:tw=78:et:ft=help:norl:
