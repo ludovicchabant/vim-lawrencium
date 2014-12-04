@@ -388,7 +388,7 @@ function! s:HgRepo.ReadCommandOutput(command, ...) abort
             " must open them all first otherwise we could delete the whole
             " contents of the last fold (since Vim may close them all by
             " default).
-            normal! zRGdd
+            normal! zRG"_dd
         endif
     endfunction
 
