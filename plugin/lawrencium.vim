@@ -697,9 +697,9 @@ function! s:read_lawrencium_log(repo, path_parts, full_path) abort
     let l:log_cmd = "log " . l:log_opts
 
     if a:path_parts['path'] == ''
-        call a:repo.ReadCommandOutput(l:log_cmd, '--style', shellescape(s:log_style_file))
+        call a:repo.ReadCommandOutput(l:log_cmd, '--style', s:log_style_file)
     else
-        call a:repo.ReadCommandOutput(l:log_cmd, '--style', shellescape(s:log_style_file), a:full_path)
+        call a:repo.ReadCommandOutput(l:log_cmd, '--style', s:log_style_file, a:full_path)
     endif
     setlocal filetype=hglog
 endfunction
