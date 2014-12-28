@@ -1146,7 +1146,7 @@ function! s:HgStatus_DiffSummary(split) abort
     let l:reuse_id = 'lawrencium_diffsum_for_' . bufnr('%')
     let l:split_prev_win = (a:split < 3)
     let l:args = {'reuse_id': l:reuse_id, 'use_prev_win': l:split_prev_win,
-                \'split_mode': a:split}
+                \'avoid_win': winnr(), 'split_mode': a:split}
     call s:HgDiffSummary(l:path, l:args)
 endfunction
 
@@ -1477,6 +1477,7 @@ function! s:HgDiffSummary(filename, present_args, ...) abort
     let l:target_winnr = -1
     let l:split = get(l:valid_args, 'split_mode', 0)
     let l:reuse_id = get(l:valid_args, 'reuse_id', '')
+    let l:avoid_id = get(l:valid_args, 'avoid_win', -1)
     if l:reuse_id != ''
         let l:target_winnr = s:find_buffer_window(l:reuse_id, 1)
         if l:target_winnr > 0 && l:split != 3
@@ -1488,12 +1489,25 @@ function! s:HgDiffSummary(filename, present_args, ...) abort
     endif
     " If we didn't find anything, see if we should use the current or previous
     " window.
-    if l:target_winnr < 0
+    if l:target_winnr <= 0
         let l:use_prev_win = get(l:valid_args, 'use_prev_win', 0)
         if l:use_prev_win
             let l:target_winnr = winnr('#')
             call s:trace("Will use previous window: ".l:target_winnr)
         endif
+    endif
+    " And let's see if we have a window we should actually avoid.
+    if l:avoid_id >= 0 && 
+                \(l:target_winnr == l:avoid_id ||
+                \(l:target_winnr <= 0 && winnr() == l:avoid_id))
+        for wnr in range(1, winnr('$'))
+            if wnr != l:avoid_id
+                call s:trace("Avoiding using window ".l:avoid_id.
+                            \", now using: ".wnr)
+                let l:target_winnr = wnr
+                break
+            endif
+        endfor
     endif
     " Now let's see what kind of split we want to use, if any.
     let l:cmd = 'edit '
