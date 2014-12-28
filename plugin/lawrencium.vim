@@ -1,6 +1,6 @@
 " lawrencium.vim - A Mercurial wrapper
 " Maintainer:   Ludovic Chabant <http://ludovic.chabant.com>
-" Version:      0.3.1
+" Version:      0.4.0
 
 " Globals {{{
 
