@@ -1014,6 +1014,7 @@ function! s:HgStatus() abort
     command! -buffer          Hgstatusvdiffsum      :call s:HgStatus_DiffSummary(2)
     command! -buffer          Hgstatustabdiffsum    :call s:HgStatus_DiffSummary(3)
     command! -buffer          Hgstatusrefresh       :call s:HgStatus_Refresh()
+    command! -buffer -range -bang Hgstatusrevert    :call s:HgStatus_Revert(<line1>, <line2>, <bang>0)
     command! -buffer -range   Hgstatusaddremove     :call s:HgStatus_AddRemove(<line1>, <line2>)
     command! -buffer -range=% -bang Hgstatuscommit  :call s:HgStatus_Commit(<line1>, <line2>, <bang>0, 0)
     command! -buffer -range=% -bang Hgstatusvcommit :call s:HgStatus_Commit(<line1>, <line2>, <bang>0, 1)
@@ -1105,6 +1106,26 @@ function! s:HgStatus_AddRemove(linestart, lineend) abort
     " Run `addremove` on those paths.
     let l:repo = s:hg_repo()
     call l:repo.RunCommand('addremove', l:filenames)
+
+    " Refresh the status window.
+    call s:HgStatus_Refresh()
+endfunction
+
+function! s:HgStatus_Revert(linestart, lineend, bang) abort
+    " Get the selected filenames.
+    let l:filenames = s:HgStatus_GetSelectedFiles(a:linestart, a:lineend, ['M', 'A', 'R'])
+    if len(l:filenames) == 0
+        call s:error("No files to revert in selection or current line.")
+        return
+    endif
+
+    " Run `revert` on those paths.
+    " If the bang modifier is specified, revert with no backup.
+    let l:repo = s:hg_repo()
+    if a:bang
+        call insert(l:filenames, '-C', 0)
+    endif
+    call l:repo.RunCommand('revert', l:filenames)
 
     " Refresh the status window.
     call s:HgStatus_Refresh()
