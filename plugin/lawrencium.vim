@@ -1089,7 +1089,7 @@ function! s:HgStatus_FileEdit(newtab) abort
         tabnew
         let l:cleanupbufnr = bufnr('%')
     endif
-    execute 'edit ' . escape(l:filename, ' \')
+    execute 'edit ' . fnameescape(l:filename)
     if l:cleanupbufnr >= 0
         execute 'bdelete ' . l:cleanupbufnr
     endif
