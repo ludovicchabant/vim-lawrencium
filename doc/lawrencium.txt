@@ -336,6 +336,11 @@ following descriptions.
 :Hgstatusvcommit        Similar to |:Hgstatuscommit|, but use a vertical
                         split, as with |:Hgvcommit|.
 
+                                                *:Hgstatusrevert*
+:Hgstatusrevert         Runs |:Hgrevert| on the file under the cursor, or in
+                        the current selection. The |<bang>| option is used
+                        just like in |:Hgrevert|.
+
                                                 *:Hgstatusrefresh*
 :Hgstatusrefresh        Refreshes the status window by running `hg status`
                         again.
