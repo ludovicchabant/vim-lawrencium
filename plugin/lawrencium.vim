@@ -134,7 +134,7 @@ function! s:find_repo_root(path)
     let l:path = s:stripslash(a:path)
     let l:previous_path = ""
     while l:path != l:previous_path
-        if isdirectory(l:path . '/.hg/store')
+        if isdirectory(l:path . '/.hg')
             return s:normalizepath(simplify(fnamemodify(l:path, ':p')))
         endif
         let l:previous_path = l:path
