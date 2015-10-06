@@ -162,12 +162,21 @@ All commands defined by |lawrencium| are local to each buffer.
 
 :Hgrevert {files}                               *:Hgrevert*
                         Reverts the given files (in repo-relative paths). If no
-                        file are given, reverts the current file.
+                        files are given, reverts the current file.
 
 :Hgrevert! {files}                              *:Hgrevert!*
                         Same as |:Hgrevert| but with the --no-backup option
                         given to prevent a .orig backup file from being
                         created.
+
+:Hgremove {files}                               *:Hgremove*
+                        Removes the given files (in repo-relative paths). If
+                        no files are given, removes the current file.
+
+:Hgremove! {files}                              *:Hgremove!*
+                        Same as |:Hgremove| but with the --force option given
+                        to remove the file even if it is currently added or
+                        modified.
 
                                                 *:Hglog*
 :Hglog

@@ -1726,6 +1726,30 @@ call s:AddMainCommand("-bang -nargs=* -complete=customlist,s:ListRepoFiles Hgrev
 
 " }}}
 
+" Hgremove {{{
+
+function! s:HgRemove(bang, ...) abort
+    " Get the files to remove.
+    let l:filenames = a:000
+    if a:0 == 0
+        let l:filenames = [ expand('%:p') ]
+    endif
+    if a:bang
+        call insert(l:filenames, '--force', 0)
+    endif
+
+    " Get the repo and run the command.
+    let l:repo = s:hg_repo()
+    call l:repo.RunCommand('rm', l:filenames)
+
+    " Re-edit the file to see the change.
+    edit
+endfunction
+
+call s:AddMainCommand("-bang -nargs=* -complete=customlist,s:ListRepoFiles Hgremove :call s:HgRemove(<bang>0, <f-args>)")
+
+" }}}
+
 " Hglog, Hglogthis {{{
 
 function! s:HgLog(vertical, ...) abort
