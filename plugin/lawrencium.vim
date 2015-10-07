@@ -179,7 +179,7 @@ function! s:parse_lawrencium_path(lawrencium_path, ...)
     endif
 
     if a:0 > 0
-        execute 'cd! ' . l:root_dir
+        execute 'cd! ' . fnameescape(l:root_dir)
         if a:1 == 'relative'
             let l:repo_path = fnamemodify(l:repo_path, ':.')
         elseif a:1 == 'absolute'
@@ -308,7 +308,7 @@ endfunction
 
 " Gets a repo-relative path given any path.
 function! s:HgRepo.GetRelativePath(path) abort
-    execute 'lcd! ' . self.root_dir
+    execute 'lcd! ' . fnameescape(self.root_dir)
     let l:relative_path = fnamemodify(a:path, ':.')
     execute 'lcd! -'
     return l:relative_path
@@ -873,7 +873,7 @@ function! s:Hg(bang, ...) abort
     if g:lawrencium_auto_cd
         " Temporary set the current directory to the root of the repo
         " to make auto-completed paths work magically.
-        execute 'cd! ' . l:repo.root_dir
+        execute 'cd! ' . fnameescape(l:repo.root_dir)
     endif
     let l:output = call(l:repo.RunCommand, a:000, l:repo)
     if g:lawrencium_auto_cd
@@ -884,7 +884,7 @@ function! s:Hg(bang, ...) abort
         " Open the output of the command in a temp file.
         let l:temp_file = s:tempname('hg-output-', '.txt')
         split
-        execute 'edit ' . l:temp_file
+        execute 'edit ' . fnameescape(l:temp_file)
         call append(0, split(l:output, '\n'))
         call cursor(1, 1)
 
@@ -984,9 +984,9 @@ function! s:HgStatus() abort
 
     " Open the Lawrencium buffer in a new split window of the right size.
     if g:lawrencium_status_win_split_above
-      execute "keepalt leftabove split " . l:status_path
+      execute "keepalt leftabove split " . fnameescape(l:status_path)
     else
-      execute "keepalt rightbelow split " . l:status_path
+      execute "keepalt rightbelow split " . fnameescape(l:status_path)
     endif
     
     if (line('$') == 1 && getline(1) == '')
@@ -1262,9 +1262,9 @@ call s:AddMainCommand("-bang -nargs=? -complete=customlist,s:ListRepoDirs Hglcd 
 function! s:HgEdit(bang, filename) abort
     let l:full_path = s:hg_repo().GetFullPath(a:filename)
     if a:bang
-        execute "edit! " . l:full_path
+        execute "edit! " . fnameescape(l:full_path)
     else
-        execute "edit " . l:full_path
+        execute "edit " . fnameescape(l:full_path)
     endif
 endfunction
 
@@ -1544,7 +1544,7 @@ function! s:HgDiffSummary(filename, present_args, ...) abort
     if l:target_winnr > 0
         execute l:target_winnr . "wincmd w"
     endif
-    execute 'keepalt ' . l:cmd . l:special
+    execute 'keepalt ' . l:cmd . fnameescape(l:special)
 
     " Set the reuse ID if we had one.
     if l:reuse_id != ''
@@ -1628,7 +1628,7 @@ function! s:HgCommit_GenerateMessage(repo, filenames) abort
     let l:msg .= "HG: user: " . split(a:repo.RunCommand('showconfig ui.username'), '\n')[0] . "\n"
     let l:msg .= "HG: branch '" . split(a:repo.RunCommand('branch'), '\n')[0] . "'\n"
 
-    execute 'lcd ' . a:repo.root_dir
+    execute 'lcd ' . fnameescape(a:repo.root_dir)
     if len(a:filenames)
         let l:status_lines = split(a:repo.RunCommand('status', a:filenames), "\n")
     else
@@ -1772,9 +1772,9 @@ function! s:HgLog(vertical, ...) abort
 
     let l:log_path = l:repo.GetLawrenciumPath(l:path, 'log', l:log_opts)
     if a:vertical
-        execute 'vertical pedit ' . l:log_path
+        execute 'vertical pedit ' . fnameescape(l:log_path)
     else
-        execute 'pedit ' . l:log_path
+        execute 'pedit ' . fnameescape(l:log_path)
     endif
     wincmd P
 
@@ -1952,7 +1952,7 @@ function! s:HgAnnotate(bang, verbose, ...) abort
     if l:has_local_edits
         " Just open the output of the command.
         echom "Local edits found, will show the annotations for the parent revision."
-        execute 'edit ' . l:annotation_path
+        execute 'edit ' . fnameescape(l:annotation_path)
         setlocal nowrap nofoldenable
         setlocal filetype=hgannotate
     else
@@ -1966,7 +1966,7 @@ function! s:HgAnnotate(bang, verbose, ...) abort
         " having disabled wrapping and folds on the current file.
         " Make both windows scroll-bound.
         setlocal scrollbind nowrap nofoldenable
-        execute 'keepalt leftabove vsplit ' . l:annotation_path
+        execute 'keepalt leftabove vsplit ' . fnameescape(l:annotation_path)
         setlocal nonumber
         setlocal scrollbind nowrap nofoldenable foldcolumn=0
         setlocal filetype=hgannotate
@@ -2069,7 +2069,7 @@ function! s:HgQSeries() abort
     " Open the MQ series in the preview window and jump to it.
     let l:repo = s:hg_repo()
     let l:path = l:repo.GetLawrenciumPath('', 'qseries', '')
-    execute 'pedit ' . l:path
+    execute 'pedit ' . fnameescape(l:path)
     wincmd P
 
     " Make the series buffer a Lawrencium buffer.
@@ -2127,7 +2127,7 @@ function! s:HgQSeries_EditMessage() abort
     " Open a temp file to write the commit message.
     let l:temp_file = s:tempname('hg-qrefedit-', '.txt')
     split
-    execute 'edit ' . l:temp_file
+    execute 'edit ' . fnameescape(l:temp_file)
     call append(0, 'HG: Enter the new commit message for patch "' . l:patchname . '" here.\n')
     call append(0, '')
     call append(0, l:current)
