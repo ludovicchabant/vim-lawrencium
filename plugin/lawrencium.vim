@@ -704,6 +704,17 @@ function! s:read_lawrencium_log(repo, path_parts, full_path) abort
     setlocal filetype=hglog
 endfunction
 
+function! s:read_lawrencium_logpatch(repo, path_parts, full_path) abort
+    let l:log_cmd = 'log --patch --verbose --rev ' . a:path_parts['value']
+
+    if a:path_parts['path'] == ''
+        call a:repo.ReadCommandOutput(l:log_cmd)
+    else
+        call a:repo.ReadCommandOutput(l:log_cmd, a:full_path)
+    endif
+    setlocal filetype=diff
+endfunction
+
 " Diff revisions (`hg diff`)
 function! s:read_lawrencium_diff(repo, path_parts, full_path) abort
     let l:diffargs = []
@@ -767,6 +778,7 @@ endfunction
 let s:lawrencium_file_readers = {
             \'rev': function('s:read_lawrencium_rev'),
             \'log': function('s:read_lawrencium_log'),
+            \'logpatch': function('s:read_lawrencium_logpatch'),
             \'diff': function('s:read_lawrencium_diff'),
             \'status': function('s:read_lawrencium_status'),
             \'annotate': function('s:read_lawrencium_annotate'),
@@ -2015,8 +2027,10 @@ function! s:HgAnnotate(bang, verbose, ...) abort
 
     " Add some other nice commands and mappings.
     command! -buffer Hgannotatediffsum :call s:HgAnnotate_DiffSummary()
+    command! -buffer Hgannotatelog     :call s:HgAnnotate_DiffSummary(1)
     if g:lawrencium_define_mappings
         nnoremap <buffer> <silent> <cr> :Hgannotatediffsum<cr>
+        nnoremap <buffer> <silent> <leader><cr> :Hgannotatelog<cr>
     endif
 
     " Clean up when the annotate buffer is deleted.
@@ -2030,15 +2044,20 @@ function! s:HgAnnotate_Delete(bufnr) abort
     endif
 endfunction
 
-function! s:HgAnnotate_DiffSummary() abort
+function! s:HgAnnotate_DiffSummary(...) abort
     " Get the path for the diff of the revision specified under the cursor.
     let l:line = getline('.')
     let l:rev_hash = matchstr(l:line, '\v[a-f0-9]{12}')
+    let l:log = (a:0 > 0 ? a:1 : 0)
 
     " Get the Lawrencium path for the diff, and the buffer object for the
     " annotation.
     let l:repo = s:hg_repo()
-    let l:path = l:repo.GetLawrenciumPath(b:lawrencium_annotated_path, 'diff', l:rev_hash)
+    if l:log
+      let l:path = l:repo.GetLawrenciumPath(b:lawrencium_annotated_path, 'logpatch', l:rev_hash)
+    else
+      let l:path = l:repo.GetLawrenciumPath(b:lawrencium_annotated_path, 'diff', l:rev_hash)
+    endif
     let l:annotate_buffer = s:buffer_obj()
 
     " Find a window already displaying diffs for this annotation.
