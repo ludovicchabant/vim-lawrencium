@@ -370,10 +370,14 @@ endfunction
 
 " Runs a Mercurial command in the repo.
 function! s:HgRepo.RunCommand(command, ...) abort
+    let l:prev_hgplain = $HGPLAIN
+    let $HGPLAIN = 'true'
     let l:all_args = [a:command] + a:000
     let l:hg_command = call(self['GetCommand'], l:all_args, self)
     call s:trace("Running Mercurial command: " . l:hg_command)
-    return system(l:hg_command)
+    let l:cmd_out = system(l:hg_command)
+    let $HGPLAIN = l:prev_hgplain
+    return l:cmd_out
 endfunction
 
 " Runs a Mercurial command in the repo and reads its output into the current
