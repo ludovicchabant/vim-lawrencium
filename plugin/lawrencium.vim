@@ -375,13 +375,22 @@ endfunction
 
 " Runs a Mercurial command in the repo.
 function! s:HgRepo.RunCommand(command, ...) abort
+    let l:all_args = [1, a:command] + a:000
+    return call(self['RunCommandEx'], l:all_args, self)
+endfunction
+
+function! s:HgRepo.RunCommandEx(plain_mode, command, ...) abort
     let l:prev_hgplain = $HGPLAIN
-    let $HGPLAIN = 'true'
+    if a:plain_mode
+        let $HGPLAIN = 'true'
+    endif
     let l:all_args = [a:command] + a:000
     let l:hg_command = call(self['GetCommand'], l:all_args, self)
     call s:trace("Running Mercurial command: " . l:hg_command)
     let l:cmd_out = system(l:hg_command)
-    let $HGPLAIN = l:prev_hgplain
+    if a:plain_mode
+        let $HGPLAIN = l:prev_hgplain
+    endif
     return l:cmd_out
 endfunction
 
@@ -884,7 +893,7 @@ function! s:Hg(bang, ...) abort
         " to make auto-completed paths work magically.
         execute 'cd! ' . fnameescape(l:repo.root_dir)
     endif
-    let l:output = call(l:repo.RunCommand, a:000, l:repo)
+    let l:output = call(l:repo.RunCommandEx, [0] + a:000, l:repo)
     if g:lawrencium_auto_cd
         execute 'cd! -'
     endif
