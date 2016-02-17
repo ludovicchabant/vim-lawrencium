@@ -2188,7 +2188,7 @@ function! s:HgRecord(split) abort
     if a:split == 1
         let l:cmd = 'keepalt rightbelow vsplit '
     endif
-    let l:rev_path = l:repo.GetLawrenciumPath(expand('%'), 'rev', '')
+    let l:rev_path = l:repo.GetLawrenciumPath(expand('%:p'), 'rev', '')
     execute l:cmd . fnameescape(l:rev_path)
 
     " This new buffer with the parent revision is set as a Lawrencium buffer.
