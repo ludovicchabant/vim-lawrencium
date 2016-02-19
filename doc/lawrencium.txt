@@ -474,6 +474,9 @@ is set to `0`.
 :Hgannotatediffsum      Show a diff summary (similar to |:Hgdiffsum|) for the
                         revision mentioned under the cursor.
                         Mapped to |<CR>|.
+:Hgannotatelog          Show the complete commit for the revision mentioned
+                        under the cursor.
+                        Mapped to <Leader><CR>.
 
 
 
