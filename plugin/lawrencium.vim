@@ -61,11 +61,6 @@ function! s:stripslash(path)
     return fnamemodify(a:path, ':s?[/\\]$??')
 endfunction
 
-" Surrounds the given string with double quotes.
-function! s:addquotes(str)
-    return '"' . a:str . '"'
-endfunction
-
 " Returns whether a path is absolute.
 function! s:isabspath(path)
     return a:path =~# '\v^(\w\:)?[/\\]'
@@ -361,11 +356,7 @@ function! s:HgRepo.GetCommand(command, ...) abort
     let l:hg_command = g:lawrencium_hg_executable . ' --repository ' . shellescape(s:stripslash(self.root_dir))
     let l:hg_command = l:hg_command . ' ' . a:command
     for l:arg in l:arg_list
-        if stridx(l:arg, ' ') >= 0
-            let l:hg_command = l:hg_command . ' "' . l:arg . '"'
-        else
-            let l:hg_command = l:hg_command . ' ' . l:arg
-        endif
+		let l:hg_command = l:hg_command . ' ' . shellescape(l:arg)
     endfor
     if l:prev_shellslash
         setlocal shellslash
@@ -690,7 +681,7 @@ function! s:read_lawrencium_rev(repo, path_parts, full_path) abort
     if l:rev == ''
         call a:repo.ReadCommandOutput('cat', a:full_path)
     else
-        call a:repo.ReadCommandOutput('cat', '-r', s:addquotes(l:rev), a:full_path)
+        call a:repo.ReadCommandOutput('cat', '-r', l:rev, a:full_path)
     endif
 endfunction
 
@@ -730,11 +721,11 @@ function! s:read_lawrencium_diff(repo, path_parts, full_path) abort
         let l:rev1 = strpart(a:path_parts['value'], 0, l:commaidx)
         let l:rev2 = strpart(a:path_parts['value'], l:commaidx + 1)
         if l:rev1 == '-'
-            let l:diffargs = [ '-r', s:addquotes(l:rev2) ]
+            let l:diffargs = [ '-r', l:rev2 ]
         elseif l:rev2 == '-'
-            let l:diffargs = [ '-r', s:addquotes(l:rev1) ]
+            let l:diffargs = [ '-r', l:rev1 ]
         else
-            let l:diffargs = [ '-r', s:addquotes(l:rev1), '-r', s:addquotes(l:rev2) ]
+            let l:diffargs = [ '-r', l:rev1, '-r', l:rev2 ]
         endif
     elseif a:path_parts['value'] != ''
         let l:diffargs = [ '-c', a:path_parts['value'] ]
