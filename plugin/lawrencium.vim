@@ -2217,6 +2217,7 @@ function! s:HgRecord(split) abort
     call s:HgDiff_DiffThis(l:diff_id)
     setlocal foldmethod=marker
     call l:rec_buf.SetVar('&filetype', l:orig_buf.GetVar('&filetype'))
+    call l:rec_buf.SetVar('&fileformat', l:orig_buf.GetVar('&fileformat'))
 
     if g:lawrencium_record_start_in_working_buffer
         wincmd p
