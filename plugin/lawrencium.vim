@@ -357,7 +357,7 @@ function! s:HgRepo.GetCommand(command, ...) abort
     let l:hg_command = g:lawrencium_hg_executable . ' --repository ' . shellescape(s:stripslash(self.root_dir))
     let l:hg_command = l:hg_command . ' ' . a:command
     for l:arg in l:arg_list
-		let l:hg_command = l:hg_command . ' ' . shellescape(l:arg)
+        let l:hg_command = l:hg_command . ' ' . shellescape(l:arg)
     endfor
     if l:prev_shellslash
         setlocal shellslash
