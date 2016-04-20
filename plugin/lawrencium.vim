@@ -2209,7 +2209,7 @@ function! s:HgRecord(split) abort
     call l:orig_buf.DefineCommand('Hgrecordabort', ':call s:HgRecord_Abort()')
     call l:orig_buf.DefineCommand('Hgrecordcommit', ':call s:HgRecord_Execute()')
     call s:HgDiff_DiffThis(l:diff_id)
-    setlocal foldmethod=marker
+    setlocal foldmethod=diff
 
     " Split the window and open the parent revision in the right or bottom
     " window. Keep the current buffer in the left or top window... we're going
@@ -2245,7 +2245,7 @@ function! s:HgRecord(split) abort
 
     " Make it the other part of the diff.
     call s:HgDiff_DiffThis(l:diff_id)
-    setlocal foldmethod=marker
+    setlocal foldmethod=diff
     call l:rec_buf.SetVar('&filetype', l:orig_buf.GetVar('&filetype'))
 
     if g:lawrencium_record_start_in_working_buffer
