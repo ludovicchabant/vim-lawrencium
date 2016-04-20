@@ -2,6 +2,7 @@
 " Maintainer:   Ludovic Chabant <http://ludovic.chabant.com>
 " Version:      0.4.0
 
+
 " Globals {{{
 
 if !exists('g:lawrencium_debug')
@@ -1416,6 +1417,7 @@ function! s:HgDiff_DiffThis(diff_id) abort
     let w:lawrencium_diffoff['&cursorbind'] = &l:cursorbind
     let w:lawrencium_diffoff['&foldmethod'] = &l:foldmethod
     let w:lawrencium_diffoff['&foldcolumn'] = &l:foldcolumn
+    let w:lawrencium_diffoff['&foldenable'] = &l:foldenable
     let w:lawrencium_diff_id = a:diff_id
     diffthis
     autocmd BufWinLeave <buffer> call s:HgDiff_CleanUp()
