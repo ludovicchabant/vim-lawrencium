@@ -9,7 +9,7 @@ function! lawrencium#log#init() abort
     call lawrencium#add_reader("logpatch", "lawrencium#log#read_patch")
 endfunction
 
-let s:log_style_file = expand("<sfile>:h:h") . "/resources/hg_log.style"
+let s:log_style_file = expand("<sfile>:h:h:h") . "/resources/hg_log.style"
 
 function! lawrencium#log#read(repo, path_parts, full_path) abort
     let l:log_opts = join(split(a:path_parts['value'], ','))
@@ -87,10 +87,10 @@ function! lawrencium#log#HgLog(vertical, ...) abort
 
     " Clean up when the log buffer is deleted.
     let l:bufobj = lawrencium#buffer_obj()
-    call l:bufobj.OnDelete('call s:HgLog_Delete(' . l:bufobj.nr . ')')
+    call l:bufobj.OnDelete('call lawrencium#log#HgLog_Delete(' . l:bufobj.nr . ')')
 endfunction
 
-function! s:HgLog_Delete(bufnr)
+function! lawrencium#log#HgLog_Delete(bufnr)
     if g:lawrencium_auto_close_buffers
         call lawrencium#delete_dependency_buffers('lawrencium_diff_for', a:bufnr)
         call lawrencium#delete_dependency_buffers('lawrencium_rev_for', a:bufnr)

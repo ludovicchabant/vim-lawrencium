@@ -20,7 +20,7 @@ function! lawrencium#commit#HgCommit(bang, vertical, callback, ...) abort
     endif
 
     " Open a commit message file.
-    let l:commit_path = s:tempname('hg-editor-', '.txt')
+    let l:commit_path = lawrencium#tempname('hg-editor-', '.txt')
     let l:split = a:vertical ? 'vsplit' : 'split'
     execute l:split . ' ' . l:commit_path
     call append(0, ['', ''])
@@ -112,7 +112,7 @@ function! s:HgCommit_Execute(log_file, show_output) abort
     call lawrencium#trace("Committing with log file: " . a:log_file)
 
     " Clean all the 'HG: ' lines.
-    let l:is_valid = s:clean_commit_file(a:log_file)
+    let l:is_valid = lawrencium#clean_commit_file(a:log_file)
     if !l:is_valid
         call lawrencium#error("abort: Empty commit message")
         return

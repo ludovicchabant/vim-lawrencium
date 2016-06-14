@@ -11,8 +11,8 @@ function! lawrencium#record#HgRecord(split) abort
     let l:diff_id = localtime()
 
     " Start diffing on the current file, enable some commands.
-    call l:orig_buf.DefineCommand('Hgrecordabort', ':call s:HgRecord_Abort()')
-    call l:orig_buf.DefineCommand('Hgrecordcommit', ':call s:HgRecord_Execute()')
+    call l:orig_buf.DefineCommand('Hgrecordabort', ':call lawrencium#record#HgRecord_Abort()')
+    call l:orig_buf.DefineCommand('Hgrecordcommit', ':call lawrencium#record#HgRecord_Execute()')
     call lawrencium#diff#HgDiffThis(l:diff_id)
     setlocal foldmethod=diff
 
@@ -43,9 +43,9 @@ function! lawrencium#record#HgRecord(split) abort
 
     " Hookup the commit and abort commands.
     let l:rec_buf = lawrencium#buffer_obj()
-    call l:rec_buf.OnDelete('call s:HgRecord_Execute()')
+    call l:rec_buf.OnDelete('call lawrencium#record#HgRecord_Execute()')
     call l:rec_buf.DefineCommand('Hgrecordcommit', ':quit')
-    call l:rec_buf.DefineCommand('Hgrecordabort', ':call s:HgRecord_Abort()')
+    call l:rec_buf.DefineCommand('Hgrecordabort', ':call lawrencium#record#HgRecord_Abort()')
     call lawrencium#define_commands()
 
     " Make it the other part of the diff.
@@ -59,12 +59,12 @@ function! lawrencium#record#HgRecord(split) abort
     endif
 endfunction
 
-function! s:HgRecord_Execute() abort
+function! lawrencium#record#HgRecord_Execute() abort
     if exists('b:lawrencium_record_abort')
         " Abort flag is set, let's just cleanup.
         let l:buf_nr = b:lawrencium_record_for == '%' ? bufnr('%') :
                     \b:lawrencium_record_other_nr
-        call s:HgRecord_CleanUp(l:buf_nr)
+        call lawrencium#record#HgRecord_CleanUp(l:buf_nr)
         call lawrencium#error("abort: User requested aborting the record operation.")
         return
     endif
@@ -84,19 +84,19 @@ function! s:HgRecord_Execute() abort
     let l:working_path = fnameescape(b:lawrencium_record_for)
     let l:record_path = fnameescape(expand('%:p'))
     let l:callbacks = [
-                \'call s:HgRecord_PostExecutePre('.l:working_bufnr.', "'.
+                \'call lawrencium#record#HgRecord_PostExecutePre('.l:working_bufnr.', "'.
                     \escape(l:working_path, '\').'", "'.
                     \escape(l:record_path, '\').'")',
-                \'call s:HgRecord_PostExecutePost('.l:working_bufnr.', "'.
+                \'call lawrencium#record#HgRecord_PostExecutePost('.l:working_bufnr.', "'.
                     \escape(l:working_path, '\').'")',
-                \'call s:HgRecord_PostExecuteAbort('.l:working_bufnr.', "'.
+                \'call lawrencium#record#HgRecord_PostExecuteAbort('.l:working_bufnr.', "'.
                     \escape(l:record_path, '\').'")'
                 \]
     call lawrencium#trace("Starting commit flow with callbacks: ".string(l:callbacks))
     call lawrencium#commit#HgCommit(0, l:split, l:callbacks, b:lawrencium_record_for)
 endfunction
 
-function! s:HgRecord_PostExecutePre(working_bufnr, working_path, record_path) abort
+function! lawrencium#record#HgRecord_PostExecutePre(working_bufnr, working_path, record_path) abort
     " Just before committing, we switch the original file with the record
     " file... we'll restore things in the post-callback below.
     " We also switch on 'autoread' temporarily on the working buffer so that
@@ -111,13 +111,13 @@ function! s:HgRecord_PostExecutePre(working_bufnr, working_path, record_path) ab
     sleep 200m
 endfunction
 
-function! s:HgRecord_PostExecutePost(working_bufnr, working_path) abort
+function! lawrencium#record#HgRecord_PostExecutePost(working_bufnr, working_path) abort
     " Recover the back-up file from underneath the buffer.
     call lawrencium#trace("Recovering original file: ".a:working_path)
     silent call rename(a:working_path.'~working', a:working_path)
 
     " Clean up!
-    call s:HgRecord_CleanUp(a:working_bufnr)
+    call lawrencium#record#HgRecord_CleanUp(a:working_bufnr)
 
     " Restore default 'autoread'.
     if has('dialog_gui')
@@ -125,13 +125,13 @@ function! s:HgRecord_PostExecutePost(working_bufnr, working_path) abort
     endif
 endfunction
 
-function! s:HgRecord_PostExecuteAbort(working_bufnr, record_path) abort
-    call s:HgRecord_CleanUp(a:working_bufnr)
+function! lawrencium#record#HgRecord_PostExecuteAbort(working_bufnr, record_path) abort
+    call lawrencium#record#HgRecord_CleanUp(a:working_bufnr)
     call lawrencium#trace("Delete discarded record file: ".a:record_path)
     silent call delete(a:record_path)
 endfunction
 
-function! s:HgRecord_Abort() abort
+function! lawrencium#record#HgRecord_Abort() abort
     if b:lawrencium_record_for == '%'
         " We're in the working directory buffer. Switch to the 'recording'
         " buffer and quit.
@@ -144,7 +144,7 @@ function! s:HgRecord_Abort() abort
     quit!
 endfunction
 
-function! s:HgRecord_CleanUp(buf_nr) abort
+function! lawrencium#record#HgRecord_CleanUp(buf_nr) abort
     " Get in the original buffer and clean the local commands/variables.
     let l:buf_obj = lawrencium#buffer_obj(a:buf_nr)
     call l:buf_obj.MoveToFirstWindow()

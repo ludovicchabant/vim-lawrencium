@@ -98,7 +98,7 @@ function! lawrencium#annotate#HgAnnotate(bang, verbose, ...) abort
     let b:mercurial_dir = l:repo.root_dir
     let b:lawrencium_annotated_path = l:path
     let b:lawrencium_annotated_bufnr = l:bufnr
-    call s:DefineMainCommands()
+    call lawrencium#define_commands()
 
     " Add some other nice commands and mappings.
     command! -buffer Hgannotatediffsum :call s:HgAnnotate_DiffSummary()
@@ -110,12 +110,12 @@ function! lawrencium#annotate#HgAnnotate(bang, verbose, ...) abort
 
     " Clean up when the annotate buffer is deleted.
     let l:bufobj = lawrencium#buffer_obj()
-    call l:bufobj.OnDelete('call s:HgAnnotate_Delete(' . l:bufobj.nr . ')')
+    call l:bufobj.OnDelete('call lawrencium#annotate#HgAnnotate_Delete(' . l:bufobj.nr . ')')
 endfunction
 
-function! s:HgAnnotate_Delete(bufnr) abort
+function! lawrencium#annotate#HgAnnotate_Delete(bufnr) abort
     if g:lawrencium_auto_close_buffers
-        call s:delete_dependency_buffers('lawrencium_diff_for', a:bufnr)
+        call lawrencium#delete_dependency_buffers('lawrencium_diff_for', a:bufnr)
     endif
 endfunction
 
@@ -136,7 +136,7 @@ function! s:HgAnnotate_DiffSummary(...) abort
     let l:annotate_buffer = lawrencium#buffer_obj()
 
     " Find a window already displaying diffs for this annotation.
-    let l:diff_winnr = s:find_buffer_window('lawrencium_diff_for', l:annotate_buffer.nr)
+    let l:diff_winnr = lawrencium#find_buffer_window('lawrencium_diff_for', l:annotate_buffer.nr)
     if l:diff_winnr == -1
         " Not found... go back to the main source buffer and open a bottom 
         " split with the diff for the specified revision.

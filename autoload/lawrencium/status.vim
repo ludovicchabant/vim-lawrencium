@@ -80,7 +80,7 @@ function! lawrencium#status#HgStatus() abort
     endif
 endfunction
 
-function! s:HgStatus_Refresh(...) abort
+function! lawrencium#status#HgStatusRefresh(...) abort
     if a:0 > 0
         let l:win_nr = bufwinnr(a:1)
         call lawrencium#trace("Switching back to status window ".l:win_nr)
@@ -102,6 +102,10 @@ function! s:HgStatus_Refresh(...) abort
     " Just re-edit the buffer, it will reload the contents by calling
     " the matching Mercurial command.
     edit
+endfunction
+
+function! s:HgStatus_Refresh() abort
+    call lawrencium#status#HgStatusRefresh()
 endfunction
 
 function! s:HgStatus_FileEdit(newtab) abort
@@ -148,7 +152,7 @@ function! s:HgStatus_AddRemove(linestart, lineend) abort
     call l:repo.RunCommand('addremove', l:filenames)
 
     " Refresh the status window.
-    call s:HgStatus_Refresh()
+    call lawrencium#status#HgStatusRefresh()
 endfunction
 
 function! s:HgStatus_Revert(linestart, lineend, bang) abort
@@ -168,7 +172,7 @@ function! s:HgStatus_Revert(linestart, lineend, bang) abort
     call l:repo.RunCommand('revert', l:filenames)
 
     " Refresh the status window.
-    call s:HgStatus_Refresh()
+    call lawrencium#status#HgStatusRefresh()
 endfunction
 
 function! s:HgStatus_Commit(linestart, lineend, bang, vertical) abort
@@ -181,7 +185,7 @@ function! s:HgStatus_Commit(linestart, lineend, bang, vertical) abort
 
     " Run `Hgcommit` on those paths.
     let l:buf_nr = bufnr('%')
-    let l:callback = 'call s:HgStatus_Refresh('.l:buf_nr.')'
+    let l:callback = 'call lawrencium#status#HgStatusRefresh('.l:buf_nr.')'
     call lawrencium#commit#HgCommit(a:bang, a:vertical, l:callback, l:filenames)
 endfunction
 
@@ -230,7 +234,7 @@ function! s:HgStatus_QNew(linestart, lineend, patchname, ...) abort
     call l:repo.RunCommand('qnew', l:filenames)
 
     " Refresh the status window.
-    call s:HgStatus_Refresh()
+    call lawrencium#status#HgStatusRefresh()
 endfunction
 
 function! s:HgStatus_QRefresh(linestart, lineend) abort
@@ -247,7 +251,7 @@ function! s:HgStatus_QRefresh(linestart, lineend) abort
     call l:repo.RunCommand('qrefresh', l:filenames)
 
     " Refresh the status window.
-    call s:HgStatus_Refresh()
+    call lawrencium#status#HgStatusRefresh()
 endfunction
 
 

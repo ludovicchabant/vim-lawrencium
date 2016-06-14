@@ -50,7 +50,7 @@ else
 endif
 
 " Include the command file type mappings.
-let s:file_type_mappings = expand("<sfile>:h:h") . '/resources/hg_command_file_types.vim'
+let s:file_type_mappings = expand("<sfile>:h:h:h") . '/resources/hg_command_file_types.vim'
 if filereadable(s:file_type_mappings)
     execute "source " . fnameescape(s:file_type_mappings)
 endif
