@@ -167,7 +167,7 @@ function! s:HgLog_GetSelectedRev(...) abort
     " Behold, Vim's look-ahead regex syntax again! WTF.
     let l:rev = matchstr(l:line, '\v^(\d+)(\:)@=')
     if l:rev == ''
-        call lawrencium#throw("Can't parse revision number from line: " . l:line)
+        call lawrencium#throwerr("Can't parse revision number from line: " . l:line)
     endif
     return l:rev
 endfunction

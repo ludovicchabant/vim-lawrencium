@@ -70,7 +70,7 @@ function! lawrencium#record#HgRecord_Execute() abort
     endif
 
     if !exists('b:lawrencium_record_for')
-        call lawrencium#throw("This doesn't seem like a record buffer, something's wrong!")
+        call lawrencium#throwerr("This doesn't seem like a record buffer, something's wrong!")
     endif
     if b:lawrencium_record_for == '%'
         " Switch to the 'recording' buffer's window.
@@ -149,7 +149,7 @@ function! lawrencium#record#HgRecord_CleanUp(buf_nr) abort
     let l:buf_obj = lawrencium#buffer_obj(a:buf_nr)
     call l:buf_obj.MoveToFirstWindow()
     if !exists('b:lawrencium_record_for') || b:lawrencium_record_for != '%'
-        call lawrencium#throw("Cleaning up something else than the original buffer ".
+        call lawrencium#throwerr("Cleaning up something else than the original buffer ".
                 \"for a record operation. That's suspiciously incorrect! ".
                 \"Aborting.")
     endif

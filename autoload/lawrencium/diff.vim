@@ -127,7 +127,7 @@ function! s:HgDiff_DiffThis(diff_id) abort
     " It's needed because `diffoff` reverts those settings to their default
     " values, instead of their previous ones.
     if &diff
-        call lawrencium#throw("Calling diffthis too late on a buffer!")
+        call lawrencium#throwerr("Calling diffthis too late on a buffer!")
         return
     endif
     call lawrencium#trace('Enabling diff mode on ' . bufname('%'))

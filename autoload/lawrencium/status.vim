@@ -85,7 +85,7 @@ function! lawrencium#status#HgStatusRefresh(...) abort
         let l:win_nr = bufwinnr(a:1)
         call lawrencium#trace("Switching back to status window ".l:win_nr)
         if l:win_nr < 0
-            call lawrencium#throw("Can't find the status window anymore!")
+            call lawrencium#throwerr("Can't find the status window anymore!")
         endif
         execute l:win_nr . 'wincmd w'
         " Delete everything in the buffer, and re-read the status into it.

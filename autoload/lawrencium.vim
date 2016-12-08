@@ -68,6 +68,11 @@ endfunction
 
 " Throw a Lawrencium exception message.
 function! lawrencium#throw(message)
+    throw "lawrencium: " . a:message
+endfunction
+
+" Throw a Lawrencium exception message and set Vim's error message.
+function! lawrencium#throwerr(message)
     let v:errmsg = "lawrencium: " . a:message
     throw v:errmsg
 endfunction
@@ -253,7 +258,7 @@ endfunction
 function! s:HgRepo.GetFullPath(path) abort
     let l:root_dir = self.root_dir
     if lawrencium#isabspath(a:path)
-        call lawrencium#throw("Expected relative path, got absolute path: " . a:path)
+        call lawrencium#throwerr("Expected relative path, got absolute path: " . a:path)
     endif
     return lawrencium#normalizepath(l:root_dir . a:path)
 endfunction
@@ -459,7 +464,7 @@ endfunction
 
 function! s:Buffer.DefineCommand(name, ...) dict abort
     if a:0 == 0
-        call lawrencium#throw("Not enough parameters for s:Buffer.DefineCommands()")
+        call lawrencium#throwerr("Not enough parameters for s:Buffer.DefineCommands()")
     endif
     if a:0 == 1
         let l:flags = ''
@@ -469,10 +474,10 @@ function! s:Buffer.DefineCommand(name, ...) dict abort
         let l:cmd = a:2
     endif
     if has_key(self.cmd_names, a:name)
-        call lawrencium#throw("Command '".a:name."' is already defined in buffer ".self.nr)
+        call lawrencium#throwerr("Command '".a:name."' is already defined in buffer ".self.nr)
     endif
     if bufnr('%') != self.nr
-        call lawrencium#throw("You must move to buffer ".self.nr."first before defining local commands")
+        call lawrencium#throwerr("You must move to buffer ".self.nr."first before defining local commands")
     endif
     let self.cmd_names[a:name] = 1
     let l:real_flags = ''
@@ -484,10 +489,10 @@ endfunction
 
 function! s:Buffer.DeleteCommand(name) dict abort
     if !has_key(self.cmd_names, a:name)
-        call lawrencium#throw("Command '".a:name."' has not been defined in buffer ".self.nr)
+        call lawrencium#throwerr("Command '".a:name."' has not been defined in buffer ".self.nr)
     endif
     if bufnr('%') != self.nr
-        call lawrencium#throw("You must move to buffer ".self.nr."first before deleting local commands")
+        call lawrencium#throwerr("You must move to buffer ".self.nr."first before deleting local commands")
     endif
     execute 'delcommand '.a:name
     call remove(self.cmd_names, a:name)
@@ -495,7 +500,7 @@ endfunction
 
 function! s:Buffer.DeleteCommands() dict abort
     if bufnr('%') != self.nr
-        call lawrencium#throw("You must move to buffer ".self.nr."first before deleting local commands")
+        call lawrencium#throwerr("You must move to buffer ".self.nr."first before deleting local commands")
     endif
     for name in keys(self.cmd_names)
         execute 'delcommand '.name
@@ -509,7 +514,7 @@ function! s:Buffer.MoveToFirstWindow() dict abort
         if a:0 > 0 && a:1 == 0
             return 0
         endif
-        call lawrencium#throw("No windows currently showing buffer ".self.nr)
+        call lawrencium#throwerr("No windows currently showing buffer ".self.nr)
     endif
     execute l:win_nr.'wincmd w'
     return 1
@@ -673,7 +678,7 @@ let s:lawrencium_file_customoptions = {}
 
 function! lawrencium#add_reader(action, callback, ...) abort
     if has_key(s:lawrencium_file_readers, a:action)
-        call lawrencium#throw("Lawrencium file '".a:action."' has alredy been registered.")
+        call lawrencium#throwerr("Lawrencium file '".a:action."' has alredy been registered.")
     endif
     let s:lawrencium_file_readers[a:action] = function(a:callback)
     if a:0 && a:1
@@ -685,10 +690,10 @@ function! lawrencium#read_lawrencium_file(path) abort
     call lawrencium#trace("Reading Lawrencium file: " . a:path)
     let l:path_parts = lawrencium#parse_lawrencium_path(a:path)
     if l:path_parts['root'] == ''
-        call lawrencium#throw("Can't get repository root from: " . a:path)
+        call lawrencium#throwerr("Can't get repository root from: " . a:path)
     endif
     if !has_key(s:lawrencium_file_readers, l:path_parts['action'])
-        call lawrencium#throw("No registered reader for action: " . l:path_parts['action'])
+        call lawrencium#throwerr("No registered reader for action: " . l:path_parts['action'])
     endif
 
     " Call the registered reader.
