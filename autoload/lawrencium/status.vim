@@ -1,15 +1,33 @@
 
 function! lawrencium#status#init() abort
-    call lawrencium#add_command("Hgstatus :call lawrencium#status#HgStatus()")
+    call lawrencium#add_command("Hgstatus :call lawrencium#status#HgStatus(0, '')")
+    call lawrencium#add_command("-nargs=1 Hgchangestatus :call lawrencium#status#HgStatus(1, <q-args>)")
 
     call lawrencium#add_reader('status', "lawrencium#status#read", 1)
+    call lawrencium#add_reader('changestatus', "lawrencium#status#read_change", 1)
 endfunction
 
 function! lawrencium#status#read(repo, path_parts, full_path) abort
+    call s:do_read_status(a:repo, a:path_parts, a:full_path, '', '')
+endfunction
+
+function! lawrencium#status#read_change(repo, path_parts, full_path) abort
+    call s:do_read_status(a:repo, a:path_parts, a:full_path, '--change', a:path_parts['value'])
+endfunction
+
+function! s:do_read_status(repo, path_parts, full_path, opt, opt_val) abort
     if a:path_parts['path'] == ''
-        call a:repo.ReadCommandOutput('status')
+        if a:opt == ''
+            call a:repo.ReadCommandOutput('status')
+        else
+            call a:repo.ReadCommandOutput('status', a:opt, a:opt_val)
+        endif
     else
-        call a:repo.ReadCommandOutput('status', a:full_path)
+        if a:opt == ''
+            call a:repo.ReadCommandOutput('status', a:full_path)
+        else
+            call a:repo.ReadCommandOutput('status', a:opt, a:opt_val, a:full_path)
+        endif
     endif
     setlocal nomodified
     setlocal filetype=hgstatus
@@ -17,10 +35,16 @@ function! lawrencium#status#read(repo, path_parts, full_path) abort
     setlocal buftype=nofile
 endfunction
 
-function! lawrencium#status#HgStatus() abort
+function! lawrencium#status#HgStatus(status_type, status_param) abort
     " Get the repo and the Lawrencium path for `hg status`.
     let l:repo = lawrencium#hg_repo()
-    let l:status_path = l:repo.GetLawrenciumPath('', 'status', '')
+    if a:status_type == 0
+        let l:status_path = l:repo.GetLawrenciumPath('', 'status', '')
+    elseif a:status_type == 1
+        let l:status_path = l:repo.GetLawrenciumPath('', 'changestatus', a:status_param)
+    else
+        call lawrencium#throwerr("Invalid status type: " . string(a:status_type))
+    endif
 
     " Open the Lawrencium buffer in a new split window of the right size.
     if g:lawrencium_status_win_split_above
@@ -45,8 +69,10 @@ function! lawrencium#status#HgStatus() abort
       execute "resize " . (line('$') + 1)
     endif
 
+    let b:lawrencium_status_type = a:status_type
+    let b:lawrencium_status_param = a:status_param
+
     " Add some nice commands.
-    command! -buffer          Hgstatusedit          :call s:HgStatus_FileEdit(0)
     command! -buffer          Hgstatusdiff          :call s:HgStatus_Diff(0)
     command! -buffer          Hgstatusvdiff         :call s:HgStatus_Diff(1)
     command! -buffer          Hgstatustabdiff       :call s:HgStatus_Diff(2)
@@ -54,29 +80,38 @@ function! lawrencium#status#HgStatus() abort
     command! -buffer          Hgstatusvdiffsum      :call s:HgStatus_DiffSummary(2)
     command! -buffer          Hgstatustabdiffsum    :call s:HgStatus_DiffSummary(3)
     command! -buffer          Hgstatusrefresh       :call s:HgStatus_Refresh()
-    command! -buffer -range -bang Hgstatusrevert    :call s:HgStatus_Revert(<line1>, <line2>, <bang>0)
-    command! -buffer -range   Hgstatusaddremove     :call s:HgStatus_AddRemove(<line1>, <line2>)
-    command! -buffer -range=% -bang Hgstatuscommit  :call s:HgStatus_Commit(<line1>, <line2>, <bang>0, 0)
-    command! -buffer -range=% -bang Hgstatusvcommit :call s:HgStatus_Commit(<line1>, <line2>, <bang>0, 1)
-    command! -buffer -range=% -nargs=+ Hgstatusqnew :call s:HgStatus_QNew(<line1>, <line2>, <f-args>)
-    command! -buffer -range=% Hgstatusqrefresh      :call s:HgStatus_QRefresh(<line1>, <line2>)
+    if a:status_type == 0
+        command! -buffer          Hgstatusedit          :call s:HgStatus_FileEdit(0)
+        command! -buffer -range -bang Hgstatusrevert    :call s:HgStatus_Revert(<line1>, <line2>, <bang>0)
+        command! -buffer -range   Hgstatusaddremove     :call s:HgStatus_AddRemove(<line1>, <line2>)
+        command! -buffer -range=% -bang Hgstatuscommit  :call s:HgStatus_Commit(<line1>, <line2>, <bang>0, 0)
+        command! -buffer -range=% -bang Hgstatusvcommit :call s:HgStatus_Commit(<line1>, <line2>, <bang>0, 1)
+        command! -buffer -range=% -nargs=+ Hgstatusqnew :call s:HgStatus_QNew(<line1>, <line2>, <f-args>)
+        command! -buffer -range=% Hgstatusqrefresh      :call s:HgStatus_QRefresh(<line1>, <line2>)
+    elseif a:status_type == 1
+        command! -buffer          Hgstatusedit          :call s:HgStatus_FileEdit(0)
+    endif
 
     " Add some handy mappings.
     if g:lawrencium_define_mappings
-        nnoremap <buffer> <silent> <cr>  :Hgstatusedit<cr>
         nnoremap <buffer> <silent> <C-N> :call search('^[MARC\!\?I ]\s.', 'We')<cr>
         nnoremap <buffer> <silent> <C-P> :call search('^[MARC\!\?I ]\s.', 'Wbe')<cr>
         nnoremap <buffer> <silent> <C-D> :Hgstatustabdiff<cr>
         nnoremap <buffer> <silent> <C-V> :Hgstatusvdiff<cr>
         nnoremap <buffer> <silent> <C-U> :Hgstatusdiffsum<cr>
         nnoremap <buffer> <silent> <C-H> :Hgstatusvdiffsum<cr>
-        nnoremap <buffer> <silent> <C-A> :Hgstatusaddremove<cr>
-        nnoremap <buffer> <silent> <C-S> :Hgstatuscommit<cr>
-        nnoremap <buffer> <silent> <C-R> :Hgstatusrefresh<cr>
         nnoremap <buffer> <silent> q     :bdelete!<cr>
+        if a:status_type == 0
+            nnoremap <buffer> <silent> <cr>  :Hgstatusedit<cr>
+            nnoremap <buffer> <silent> <C-A> :Hgstatusaddremove<cr>
+            nnoremap <buffer> <silent> <C-S> :Hgstatuscommit<cr>
+            nnoremap <buffer> <silent> <C-R> :Hgstatusrefresh<cr>
 
-        vnoremap <buffer> <silent> <C-A> :Hgstatusaddremove<cr>
-        vnoremap <buffer> <silent> <C-S> :Hgstatuscommit<cr>
+            vnoremap <buffer> <silent> <C-A> :Hgstatusaddremove<cr>
+            vnoremap <buffer> <silent> <C-S> :Hgstatuscommit<cr>
+        elseif a:status_type == 1
+            nnoremap <buffer> <silent> <cr>  :Hgstatusedit<cr>
+        endif
     endif
 endfunction
 
@@ -112,18 +147,24 @@ function! s:HgStatus_FileEdit(newtab) abort
     " Get the path of the file the cursor is on.
     let l:filename = s:HgStatus_GetSelectedFile()
 
+    " Remember what kind of revision we need to read.
+    let l:status_type = b:lawrencium_status_type
+    let l:status_param = b:lawrencium_status_param
+
     let l:cleanupbufnr = -1
     if a:newtab == 0
-        " If the file is already open in a window, jump to that window.
-        " Otherwise, jump to the previous window and open it there.
-        for nr in range(1, winnr('$'))
-            let l:br = winbufnr(nr)
-            let l:bpath = fnamemodify(bufname(l:br), ':p')
-            if l:bpath ==# l:filename
-                execute nr . 'wincmd w'
-                return
-            endif
-        endfor
+        if l:status_type == 0
+            " If the file is already open in a window, jump to that window.
+            for nr in range(1, winnr('$'))
+                let l:br = winbufnr(nr)
+                let l:bpath = fnamemodify(bufname(l:br), ':p')
+                if l:bpath ==# l:filename
+                    execute nr . 'wincmd w'
+                    return
+                endif
+            endfor
+        endif
+        " Jump to the previous window and open the file there.
         wincmd p
     else
         " Just open a new tab so we can edit the file there.
@@ -133,7 +174,17 @@ function! s:HgStatus_FileEdit(newtab) abort
         tabnew
         let l:cleanupbufnr = bufnr('%')
     endif
-    execute 'edit ' . fnameescape(l:filename)
+
+    if l:status_type == 0
+        " Just normal status.
+        execute 'edit ' . fnameescape(l:filename)
+    elseif l:status_type == 1
+        " Status for some given change. Show the file after the change.
+        let l:repo = lawrencium#hg_repo()
+        let l:rev_path = l:repo.GetLawrenciumPath(l:filename, 'rev', l:status_param)
+        execute 'edit ' . fnameescape(l:rev_path)
+    endif
+
     if l:cleanupbufnr >= 0
         execute 'bdelete ' . l:cleanupbufnr
     endif
@@ -200,8 +251,19 @@ function! s:HgStatus_Diff(split) abort
         let l:newtab = 1
         let l:hgdiffsplit = 1
     endif
+
+    " Remember what kind of revision we need to read.
+    let l:status_type = b:lawrencium_status_type
+    let l:status_param = b:lawrencium_status_param
+
     call s:HgStatus_FileEdit(l:newtab)
-    call lawrencium#diff#HgDiff('%:p', l:hgdiffsplit)
+    if l:status_type == 0
+        call lawrencium#diff#HgDiff('%:p', l:hgdiffsplit)
+    elseif l:status_type == 1
+        let l:rev1 = 'p1('.l:status_param.')'
+        let l:rev2 = l:status_param
+        call lawrencium#diff#HgDiff('%:p', l:hgdiffsplit, l:rev1, l:rev2)
+    endif
 endfunction
 
 function! s:HgStatus_DiffSummary(split) abort
@@ -212,7 +274,13 @@ function! s:HgStatus_DiffSummary(split) abort
     let l:split_prev_win = (a:split < 3)
     let l:args = {'reuse_id': l:reuse_id, 'use_prev_win': l:split_prev_win,
                 \'avoid_win': winnr(), 'split_mode': a:split}
-    call lawrencium#diff#HgDiffSummary(l:path, l:args)
+    if b:lawrencium_status_type == 0
+        call lawrencium#diff#HgDiffSummary(l:path, l:args)
+    elseif b:lawrencium_status_type == 1
+        let l:rev1 = 'p1('.b:lawrencium_status_param.')'
+        let l:rev2 = b:lawrencium_status_param
+        call lawrencium#diff#HgDiffSummary(l:path, l:args, l:rev1, l:rev2)
+    endif
 endfunction
 
 function! s:HgStatus_QNew(linestart, lineend, patchname, ...) abort
