@@ -1,7 +1,7 @@
 
 function! lawrencium#log#init() abort
-    call lawrencium#add_command("Hglogthis  :call lawrencium#log#HgLog(0, '%:p')")
-    call lawrencium#add_command("Hgvlogthis :call lawrencium#log#HgLog(1, '%:p')")
+    call lawrencium#add_command("-nargs=* Hglogthis  :call lawrencium#log#HgLog(0, '%:p', <f-args>)")
+    call lawrencium#add_command("-nargs=* Hgvlogthis :call lawrencium#log#HgLog(1, '%:p', <f-args>)")
     call lawrencium#add_command("-nargs=* -complete=customlist,lawrencium#list_repo_files Hglog  :call lawrencium#log#HgLog(0, <f-args>)")
     call lawrencium#add_command("-nargs=* -complete=customlist,lawrencium#list_repo_files Hgvlog  :call lawrencium#log#HgLog(1, <f-args>)")
 
