@@ -1,9 +1,9 @@
 
 function! lawrencium#log#init() abort
-    call lawrencium#add_command("-nargs=* Hglogthis  :call lawrencium#log#HgLog(0, '%:p', <f-args>)")
-    call lawrencium#add_command("-nargs=* Hgvlogthis :call lawrencium#log#HgLog(1, '%:p', <f-args>)")
-    call lawrencium#add_command("-nargs=* -complete=customlist,lawrencium#list_repo_files Hglog  :call lawrencium#log#HgLog(0, <f-args>)")
-    call lawrencium#add_command("-nargs=* -complete=customlist,lawrencium#list_repo_files Hgvlog  :call lawrencium#log#HgLog(1, <f-args>)")
+    call lawrencium#add_command("-nargs=* -complete=customlist,lawrencium#log#list_logthis_options Hglogthis  :call lawrencium#log#HgLog(0, '%:p', <f-args>)")
+    call lawrencium#add_command("-nargs=* -complete=customlist,lawrencium#log#list_logthis_options Hgvlogthis :call lawrencium#log#HgLog(1, '%:p', <f-args>)")
+    call lawrencium#add_command("-nargs=* -complete=customlist,lawrencium#log#list_log_options Hglog  :call lawrencium#log#HgLog(0, <f-args>)")
+    call lawrencium#add_command("-nargs=* -complete=customlist,lawrencium#log#list_log_options Hgvlog  :call lawrencium#log#HgLog(1, <f-args>)")
 
     call lawrencium#add_reader("log", "lawrencium#log#read")
     call lawrencium#add_reader("logpatch", "lawrencium#log#read_patch")
@@ -32,6 +32,24 @@ function! lawrencium#log#read_patch(repo, path_parts, full_path) abort
         call a:repo.ReadCommandOutput(l:log_cmd, a:full_path)
     endif
     setlocal filetype=diff
+endfunction
+
+function! lawrencium#log#list_logthis_options(ArgLead, CmdLine, CursorPos) abort
+    if exists('g:lawrencium_hg_commands')
+        let l:log_options = copy(g:lawrencium_hg_commands['log'])
+        return filter(l:log_options, "v:val[0:strlen(a:ArgLead)-1] ==# a:ArgLead")
+    else
+        return []
+    endif
+endfunction
+
+function! lawrencium#log#list_log_options(ArgLead, CmdLine, CursorPos) abort
+    let l:res = lawrencium#list_repo_files(a:ArgLead, a:CmdLine, a:CursorPos)
+    if exists('g:lawrencium_hg_commands') && strcharpart(a:ArgLead, 0, 1) == '-'
+        let l:log_options = copy(g:lawrencium_hg_commands['log'])
+        let l:res += filter(l:log_options, "v:val[0:strlen(a:ArgLead)-1] ==# a:ArgLead")
+    endif
+    return l:res
 endfunction
 
 function! lawrencium#log#HgLog(vertical, ...) abort
