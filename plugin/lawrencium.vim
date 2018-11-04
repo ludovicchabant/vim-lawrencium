@@ -49,6 +49,10 @@ if !exists('g:lawrencium_status_win_split_even')
     let g:lawrencium_status_win_split_even = 0
 endif
 
+if !exists('g:lawrencium_status_win_maxheight')
+    let g:lawrencium_status_win_maxheight = 50
+endif
+
 if !exists('g:lawrencium_record_start_in_working_buffer')
     let g:lawrencium_record_start_in_working_buffer = 0
 endif

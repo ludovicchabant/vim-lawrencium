@@ -573,6 +573,14 @@ g:lawrencium_status_win_split_even
                         show all modified files.
                         Defaults to `0`.
 
+                                                *lawrencium_status_win_maxheight*
+g:lawrencium_status_win_maxheight
+                        The maxiumum height, in percentage of the Vim window
+                        height, that the |Hgstatus| window is allowed to take.
+                        It will take as much room as needed to show its
+                        contents, up to this limit.
+                        Defaults to `50`.
+
                                                 *lawrencium_record_start_in_working_buffer*
 g:lawrencium_record_start_in_working_buffer
                         If set to 1, |Hgrecord| will leave focus in the

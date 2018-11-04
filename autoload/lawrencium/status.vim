@@ -48,11 +48,11 @@ function! lawrencium#status#HgStatus(status_type, status_param) abort
 
     " Open the Lawrencium buffer in a new split window of the right size.
     if g:lawrencium_status_win_split_above
-      execute "keepalt leftabove split " . fnameescape(l:status_path)
+        execute "keepalt leftabove split " . fnameescape(l:status_path)
     else
-      execute "keepalt rightbelow split " . fnameescape(l:status_path)
+        execute "keepalt rightbelow split " . fnameescape(l:status_path)
     endif
-    
+
     if (line('$') == 1 && getline(1) == '')
         " Buffer is empty, which means there are not changes...
         " Quit and display a message.
@@ -65,8 +65,14 @@ function! lawrencium#status#HgStatus(status_type, status_param) abort
 
     execute "setlocal winfixheight"
     if !g:lawrencium_status_win_split_even
-      execute "setlocal winheight=" . (line('$') + 1)
-      execute "resize " . (line('$') + 1)
+        let l:status_win_height = (line('$') + 1)
+        if g:lawrencium_status_win_maxheight > 0
+            let l:status_win_height = min([
+                        \l:status_win_height,
+                        \&lines * g:lawrencium_status_win_maxheight / 100
+                        \])
+        endif
+        execute "resize " . l:status_win_height
     endif
 
     let b:lawrencium_status_type = a:status_type
@@ -137,6 +143,21 @@ function! lawrencium#status#HgStatusRefresh(...) abort
     " Just re-edit the buffer, it will reload the contents by calling
     " the matching Mercurial command.
     edit
+
+    " The window might have been resize if something happened (like, say, we
+    " opened a commit message window, and closed it).
+    if g:lawrencium_status_win_split_even
+        execute "resize " . (&lines / 2)
+    else
+        let l:status_win_height = (line('$') + 1)
+        if g:lawrencium_status_win_maxheight > 0
+            let l:status_win_height = min([
+                        \l:status_win_height,
+                        \&lines * g:lawrencium_status_win_maxheight / 100
+                        \])
+        endif
+        execute "resize " . l:status_win_height
+    endif
 endfunction
 
 function! s:HgStatus_Refresh() abort
