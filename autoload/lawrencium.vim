@@ -351,6 +351,9 @@ endfunction
 " buffer.
 function! s:HgRepo.ReadCommandOutput(command, ...) abort
     function! s:PutOutputIntoBuffer(command_line)
+        let l:prev_hgplain = $HGPLAIN
+        let $HGPLAIN = 'true'
+
         let l:was_buffer_empty = (line('$') == 1 && getline(1) == '')
         execute '0read!' . escape(a:command_line, '%#\')
         if l:was_buffer_empty  " (Always true?)
@@ -361,6 +364,8 @@ function! s:HgRepo.ReadCommandOutput(command, ...) abort
             " default).
             normal! zRG"_dd
         endif
+
+        let $HGPLAIN = l:prev_hgplain
     endfunction
 
     let l:all_args = [a:command] + a:000
