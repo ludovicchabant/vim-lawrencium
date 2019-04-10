@@ -24,11 +24,11 @@ endfunction
 
 " Shell-slashes the path (opposite of `normalizepath`).
 function! lawrencium#shellslash(path)
-  if exists('+shellslash') && !&shellslash
-    return substitute(a:path, '\v\\', '/', 'g')
-  else
-    return a:path
-  endif
+    if exists('+shellslash') && !&shellslash
+        return substitute(a:path, '\v\\', '/', 'g')
+    else
+        return a:path
+    endif
 endfunction
 
 " Like tempname() but with some control over the filename.
