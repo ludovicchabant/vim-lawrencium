@@ -43,9 +43,8 @@ function! lawrencium#annotate#HgAnnotate(bang, verbose, ...) abort
         setlocal nowrap nofoldenable
         setlocal filetype=hgannotate
     else
-        " Store some info about the current buffer.
-        let l:cur_topline = line('w0') + &scrolloff
-        let l:cur_line = line('.')
+        " Store some info about the current window.
+        let l:view = winsaveview()
         let l:cur_wrap = &wrap
         let l:cur_foldenable = &foldenable
 
@@ -70,11 +69,7 @@ function! lawrencium#annotate#HgAnnotate(bang, verbose, ...) abort
             call l:annotate_buffer.OnDelete('setlocal foldenable')
         endif
 
-        " Go to the line we were at in the source buffer when we
-        " opened the annotation window.
-        execute l:cur_topline
-        normal! zt
-        execute l:cur_line
+        call winrestview({'lnum': l:view.lnum, 'topline': l:view.topline})
         syncbind
 
         " Set the correct window width for the annotations.
