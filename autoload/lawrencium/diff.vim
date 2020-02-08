@@ -88,7 +88,7 @@ function! lawrencium#diff#HgDiff(filename, split, ...) abort
         " Make it part of the diff group.
         call s:HgDiff_DiffThis(l:diff_id)
     else
-        let l:rev_path = l:repo.GetLawrenciumPath(l:path, 'rev', l:rev1)
+        let l:rev_path = s:GetLawrenciumPath(l:path, l:rev1)
         if a:split == 2
             " See comments above about avoiding `tabedit`.
             tabnew
@@ -112,10 +112,32 @@ function! lawrencium#diff#HgDiff(filename, split, ...) abort
     if l:rev2 == ''
         execute l:diffsplit . ' ' . fnameescape(l:path)
     else
-        let l:rev_path = l:repo.GetLawrenciumPath(l:path, 'rev', l:rev2)
+        let l:rev_path = s:GetLawrenciumPath(l:path, l:rev2)
         execute l:diffsplit . ' ' . fnameescape(l:rev_path)
     endif
     call s:HgDiff_DiffThis(l:diff_id)
+endfunction
+
+function! s:GetLawrenciumPath(path, rev)
+    return lawrencium#hg_repo().GetLawrenciumPath(s:absolute_pathname(a:path, a:rev), 'rev', a:rev)
+endfunction
+
+function! s:absolute_pathname(current_absolute_pathname, revision)
+    let l:repo = lawrencium#hg_repo()
+    if s:is_tip_revision(a:revision)
+        let name_of_copied_file = matchstr(
+                    \ l:repo.RunCommand('status', '--copies', a:current_absolute_pathname),
+                    \ '^A .\{-}\n  \zs[^\n]\+')
+        return !empty(name_of_copied_file)
+                    \ ? l:repo.root_dir . '/' . name_of_copied_file
+                    \ : a:current_absolute_pathname
+    endif
+    " TODO: handle !s:is_tip_revision(a:revision)
+    return a:current_absolute_pathname
+endfunction
+
+function! s:is_tip_revision(rev)
+    return a:rev ==# 'tip' || a:rev ==# 'p1()' || a:rev == '-1'  " TODO: Check for other ways of specifying the tip revision.
 endfunction
 
 function! lawrencium#diff#HgDiffThis(diff_id)
