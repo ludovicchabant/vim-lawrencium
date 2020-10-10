@@ -88,13 +88,21 @@ function! lawrencium#diff#HgDiff(filename, split, ...) abort
         " Make it part of the diff group.
         call s:HgDiff_DiffThis(l:diff_id)
     else
-        let l:rev_path = s:GetLawrenciumPath(l:path, l:rev1)
+        let l:rev_path = l:repo.GetLawrenciumPath(l:path, 'rev', l:rev1)
         if a:split == 2
             " See comments above about avoiding `tabedit`.
             tabnew
             let l:cleanupbufnr = bufnr('%')
         endif
         execute 'edit ' . fnameescape(l:rev_path)
+        if s:is_empty_buf()
+            " The buffer is empty. That can happen if the file was moved
+            " since this revision.
+            let l:rev_path = s:GetLawrenciumRevisionPathMaybeMoved(l:repo, l:path, l:rev1)
+            if l:rev_path != ''
+                execute 'edit ' . fnameescape(l:rev_path)
+            endif
+        endif
         " Make it part of the diff group.
         call s:HgDiff_DiffThis(l:diff_id)
     endif
@@ -112,28 +120,52 @@ function! lawrencium#diff#HgDiff(filename, split, ...) abort
     if l:rev2 == ''
         execute l:diffsplit . ' ' . fnameescape(l:path)
     else
-        let l:rev_path = s:GetLawrenciumPath(l:path, l:rev2)
+        let l:rev_path = l:repo.GetLawrenciumPath(l:path, 'rev', l:rev2)
         execute l:diffsplit . ' ' . fnameescape(l:rev_path)
+        if s:is_empty_buf()
+            let l:rev_path = s:GetLawrenciumRevisionPathMaybeMoved(l:repo, l:path, l:rev2)
+            if l:rev_path != ''
+                execute 'edit ' . fnameescape(l:rev_path)
+            endif
+        endif
     endif
     call s:HgDiff_DiffThis(l:diff_id)
 endfunction
 
-function! s:GetLawrenciumPath(path, rev)
-    return lawrencium#hg_repo().GetLawrenciumPath(s:absolute_pathname(a:path, a:rev), 'rev', a:rev)
+function! s:GetLawrenciumRevisionPathMaybeMoved(repo, path, rev)
+    let l:abs_path = s:get_real_path_if_copied(a:repo, a:path, a:rev)
+    if l:abs_path != ''
+        return a:repo.GetLawrenciumPath(l:abs_path, 'rev', a:rev)
+    else
+        return ''
+    endif
 endfunction
 
-function! s:absolute_pathname(current_absolute_pathname, revision)
-    let l:repo = lawrencium#hg_repo()
-    if s:is_tip_revision(a:revision)
-        let name_of_copied_file = matchstr(
-                    \ l:repo.RunCommand('status', '--copies', a:current_absolute_pathname),
-                    \ '^A .\{-}\n  \zs[^\n]\+')
-        return !empty(name_of_copied_file)
-                    \ ? l:repo.root_dir . '/' . name_of_copied_file
-                    \ : a:current_absolute_pathname
+function! s:GetLawrenciumDiffPathMaybeMoved(repo, path, rev)
+    let l:abs_path = s:get_real_path_if_copied(a:repo, a:path, a:rev)
+    if l:abs_path != ''
+        return a:repo.GetLawrenciumPath(l:abs_path, 'diff', a:rev)
+    else
+        return ''
     endif
-    " TODO: handle !s:is_tip_revision(a:revision)
-    return a:current_absolute_pathname
+endfunction
+
+function! s:is_empty_buf()
+    return getpos('$') == [0, 1, 1, 0]
+endfunction
+
+function! s:get_real_path_if_copied(repo, path, revision)
+    let l:status_out = a:repo.RunCommand('status', '--copies', '--rev', a:revision, a:path)
+    let l:copied_name = matchstr(
+                \ l:status_out,
+                \ '^A .\{-}\n  \zs[^\n]\+')
+    if !empty(l:copied_name)
+        let l:copied_path = (a:repo.root_dir . '/' . l:copied_name)
+        call lawrencium#trace("Found move: ".a:path." -> ".l:copied_path)
+        return l:copied_path
+    else
+        return ''
+    endif
 endfunction
 
 function! s:is_tip_revision(rev)
@@ -304,6 +336,12 @@ function! lawrencium#diff#HgDiffSummary(filename, present_args, ...) abort
         execute l:target_winnr . "wincmd w"
     endif
     execute 'keepalt ' . l:cmd . fnameescape(l:special)
+    if s:is_empty_buf()
+        let l:special = s:GetLawrenciumDiffPathMaybeMoved(l:repo, l:path, l:revs)
+        if l:special != ''
+            execute 'keepalt edit ' . fnameescape(l:special)
+        endif
+    endif
 
     " Set the reuse ID if we had one.
     if l:reuse_id != ''
