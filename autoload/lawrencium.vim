@@ -333,17 +333,10 @@ function! s:HgRepo.RunCommand(command, ...) abort
 endfunction
 
 function! s:HgRepo.RunCommandEx(plain_mode, command, ...) abort
-    let l:prev_hgplain = $HGPLAIN
-    if a:plain_mode
-        let $HGPLAIN = 'true'
-    endif
     let l:all_args = [a:command] + a:000
     let l:hg_command = call(self['GetCommand'], l:all_args, self)
     call lawrencium#trace("Running Mercurial command: " . l:hg_command)
-    let l:cmd_out = system(l:hg_command)
-    if a:plain_mode
-        let $HGPLAIN = l:prev_hgplain
-    endif
+    let l:cmd_out = system((a:plain_mode ? 'HGPLAIN=1 ' : '') . l:hg_command)
     return l:cmd_out
 endfunction
 
@@ -351,11 +344,8 @@ endfunction
 " buffer.
 function! s:HgRepo.ReadCommandOutput(command, ...) abort
     function! s:PutOutputIntoBuffer(command_line)
-        let l:prev_hgplain = $HGPLAIN
-        let $HGPLAIN = 'true'
-
         let l:was_buffer_empty = (line('$') == 1 && getline(1) == '')
-        execute '0read!' . escape(a:command_line, '%#\')
+        execute '0read!HGPLAIN=1 ' . escape(a:command_line, '%#\')
         if l:was_buffer_empty  " (Always true?)
             " '0read' inserts before the cursor, leaving a blank line which
             " needs to be deleted... but if there are folds in this thing, we
@@ -364,8 +354,6 @@ function! s:HgRepo.ReadCommandOutput(command, ...) abort
             " default).
             normal! zRG"_dd
         endif
-
-        let $HGPLAIN = l:prev_hgplain
     endfunction
 
     let l:all_args = [a:command] + a:000
