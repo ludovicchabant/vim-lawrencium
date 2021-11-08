@@ -328,12 +328,13 @@ endfunction
 
 " Runs a Mercurial command in the repo.
 function! s:HgRepo.RunCommand(command, ...) abort
+    " Use 'plain mode', and forward the command and all params to RunCommandEx
     let l:all_args = [1, a:command] + a:000
     return call(self['RunCommandEx'], l:all_args, self)
 endfunction
 
 function! s:HgRepo.RunCommandEx(plain_mode, command, ...) abort
-    let l:prev_hgplain = $HGPLAIN
+    let l:envvars = environ()
     if a:plain_mode
         let $HGPLAIN = 'true'
     endif
@@ -342,7 +343,11 @@ function! s:HgRepo.RunCommandEx(plain_mode, command, ...) abort
     call lawrencium#trace("Running Mercurial command: " . l:hg_command)
     let l:cmd_out = system(l:hg_command)
     if a:plain_mode
-        let $HGPLAIN = l:prev_hgplain
+        if has_key(l:envvars, "HGPLAIN")
+            let $HGPLAIN = l:envvars["HGPLAIN"]
+        else
+            unlet $HGPLAIN
+        endif
     endif
     return l:cmd_out
 endfunction
@@ -351,7 +356,7 @@ endfunction
 " buffer.
 function! s:HgRepo.ReadCommandOutput(command, ...) abort
     function! s:PutOutputIntoBuffer(command_line)
-        let l:prev_hgplain = $HGPLAIN
+        let l:envvars = environ()
         let $HGPLAIN = 'true'
 
         let l:was_buffer_empty = (line('$') == 1 && getline(1) == '')
@@ -365,7 +370,11 @@ function! s:HgRepo.ReadCommandOutput(command, ...) abort
             normal! zRG"_dd
         endif
 
-        let $HGPLAIN = l:prev_hgplain
+        if has_key(l:envvars, "HGPLAIN")
+            let $HGPLAIN = l:envvars["HGPLAIN"]
+        else
+            unlet $HGPLAIN
+        endif
     endfunction
 
     let l:all_args = [a:command] + a:000
