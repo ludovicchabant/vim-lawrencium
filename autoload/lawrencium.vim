@@ -55,10 +55,10 @@ endfunction
 
 " Prints a message if debug tracing is enabled.
 function! lawrencium#trace(message, ...)
-   if g:lawrencium_trace || (a:0 && a:1)
+    if g:lawrencium_trace || (a:0 && a:1)
        let l:message = "lawrencium: " . a:message
        echom l:message
-   endif
+    endif
 endfunction
 
 " Prints an error message with 'lawrencium error' prefixed to it.
