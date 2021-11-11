@@ -89,12 +89,13 @@ function! lawrencium#hg#CompleteHg(ArgLead, CmdLine, CursorPos)
             return l:copts + l:gopts
         endif
     endif
-    
+
     " Just auto-complete with filenames unless it's an option.
     if l:arglead[0] ==# '-'
         return []
     else
         return lawrencium#list_repo_files(a:ArgLead, a:CmdLine, a:CursorPos)
+    endif
 endfunction
 
 function! s:GetHgCommandName(args) abort
