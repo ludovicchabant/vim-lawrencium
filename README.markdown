@@ -28,7 +28,7 @@ repository-relative path:
 
     :Hgedit src/bar.py
 
-Take advantage of the auto-completion when typing the path! Work on that 
+Take advantage of the auto-completion when typing the path! Work on that
 other file too, then compare it to the parent revision version:
 
     :Hgvdiff
@@ -47,12 +47,12 @@ Once you're happy with your work, bring up the status window:
     :Hgstatus
 
 You can see the difference between modified files and their parent revision
-version easily by moving the cursor to the appropriate line and hitting 
-<C-V>. You can also do an `addremove` by using <C-A> (use the selection mode
+version easily by moving the cursor to the appropriate line and hitting
+`Ctrl-V`. You can also do an `addremove` by using `Ctrl-A` (use the selection mode
 to add/remove several files at once!).
 
 Now it's time to commit. While still in the status window, remove all mentions
-of files you don't want to commit, and hit <C-S>. Write your commit message,
+of files you don't want to commit, and hit `Ctrl-S`. Write your commit message,
 go `:wq`, and you're done! You can check everything went fine:
 
     :Hg tip
@@ -63,7 +63,7 @@ And that's it for now. Open the help file with `:help lawrencium`, and post
 your questions and problems in the [issue tracker][1] on BitBucket.
 
 
-  [mercurial]: http://hg-scm.com
+  [mercurial]: https://www.mercurial-scm.org/
   [vim]: http://www.vim.org
   [fugitive]: https://github.com/tpope/vim-fugitive
   [pathogen]: https://github.com/tpope/vim-pathogen
