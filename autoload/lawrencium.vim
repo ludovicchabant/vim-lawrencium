@@ -668,17 +668,37 @@ endfunction
 
 " Commands Auto-Complete {{{
 
+" Auto-complete %'d paths.
+function! lawrencium#complete_percent_path(ArgLead) abort
+    if a:ArgLead[0] ==# '%' && (len(a:ArgLead) == 1 || a:ArgLead[1] == ':')
+        let l:fnname = bufname()
+        if len(a:ArgLead) > 1
+            let l:fnmod = a:ArgLead[1:]
+            return [fnamemodify(l:fnname, l:fnmod)]
+        else
+            return [l:fnname]
+        endif
+    endif
+    return []
+endfunction
+
 " Auto-complete function for commands that take repo-relative file paths.
 function! lawrencium#list_repo_files(ArgLead, CmdLine, CursorPos) abort
-    let l:matches = lawrencium#hg_repo().Glob(a:ArgLead . '*', 1)
-    call map(l:matches, 'lawrencium#normalizepath(v:val)')
+    let l:matches = lawrencium#complete_percent_path(a:ArgLead)
+    if empty(l:matches)
+        let l:matches = lawrencium#hg_repo().Glob(a:ArgLead . '*', 1)
+        call map(l:matches, 'lawrencium#normalizepath(v:val)')
+    endif
     return l:matches
 endfunction
 
 " Auto-complete function for commands that take repo-relative directory paths.
 function! lawrencium#list_repo_dirs(ArgLead, CmdLine, CursorPos) abort
-    let l:matches = lawrencium#hg_repo().Glob(a:ArgLead . '*/')
-    call map(l:matches, 'lawrencium#normalizepath(v:val)')
+    let l:matches = lawrencium#complete_percent_path(a:ArgLead)
+    if empty(l:matches)
+        let l:matches = lawrencium#hg_repo().Glob(a:ArgLead . '*/')
+        call map(l:matches, 'lawrencium#normalizepath(v:val)')
+    endif
     return l:matches
 endfunction
 
