@@ -30,7 +30,7 @@ function! lawrencium#annotate#HgAnnotate(bang, verbose, ...) abort
     
     " Check if we're trying to annotate something with local changes.
     let l:has_local_edits = 0
-    let l:path_status = l:repo.RunCommand('status', l:path)
+    let l:path_status = l:repo.RunCommand('status', '-m', l:path)
     if l:path_status != ''
         call lawrencium#trace("Found local edits for '" . l:path . "'. Will annotate parent revision.")
         let l:has_local_edits = 1
