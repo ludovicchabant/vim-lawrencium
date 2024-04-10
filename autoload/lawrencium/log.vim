@@ -4,6 +4,8 @@ function! lawrencium#log#init() abort
     call lawrencium#add_command("-nargs=* -complete=customlist,lawrencium#log#list_logthis_options Hgvlogthis :call lawrencium#log#HgLog(1, '%:p', <f-args>)")
     call lawrencium#add_command("-nargs=* -complete=customlist,lawrencium#log#list_log_options Hglog  :call lawrencium#log#HgLog(0, <f-args>)")
     call lawrencium#add_command("-nargs=* -complete=customlist,lawrencium#log#list_log_options Hgvlog  :call lawrencium#log#HgLog(1, <f-args>)")
+    call lawrencium#add_command("Hglogline  :call lawrencium#log#HgLogLine(0)")
+    call lawrencium#add_command("Hgvlogline :call lawrencium#log#HgLogLine(1)")
 
     call lawrencium#add_reader("log", "lawrencium#log#read")
     call lawrencium#add_reader("logpatch", "lawrencium#log#read_patch")
@@ -106,6 +108,23 @@ function! lawrencium#log#HgLog(vertical, ...) abort
     " Clean up when the log buffer is deleted.
     let l:bufobj = lawrencium#buffer_obj()
     call l:bufobj.OnDelete('call lawrencium#log#HgLog_Delete(' . l:bufobj.nr . ')')
+endfunction
+
+function! lawrencium#log#HgLogLine(vertical, ...) abort
+    let l:path = expand('%:p')
+    let l:repo = lawrencium#hg_repo()
+    let l:annotate_lines = split(l:repo.RunCommand('annotate', l:path, '-T', "{lines % '{node}\\n'}"), "\n")
+
+    let l:cur_line = line('.')
+    if (l:cur_line - 1) < len(l:annotate_lines)
+        let l:line_rev = l:annotate_lines[l:cur_line - 1]
+        let l:rev_range = l:line_rev . '^..' . l:line_rev
+        call lawrencium#log#HgLog(a:vertical, l:path, '-r', l:rev_range)
+    else
+        call lawrencium#error(
+                    \"Can't find line " . (l:cur_line - 1) . " in annotate command output. " .
+                    \"Got " . len(l:annotate_lines) . " lines.")
+    endif
 endfunction
 
 function! lawrencium#log#HgLog_Delete(bufnr)

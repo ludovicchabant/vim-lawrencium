@@ -190,6 +190,11 @@ All commands defined by |lawrencium| are local to each buffer.
 :Hglog {file}           Same as |:Hglog|, but opens the log for the specified
                         file or direcotry instead of the whole repository.
 
+                                                *:Hglogline*
+:Hglogline              Gets the last revision that changed the line currently
+                        under the cursor and shows the log entry for it, as if
+                        running |:Hgannotate| followed by `Hglog <rev>`.
+
                                                 *:Hglogthis*
 :Hglogthis              Same as |:Hglog| but opens the history (log) for the
                         currently edited file instead of the whole repository.
